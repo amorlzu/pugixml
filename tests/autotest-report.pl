@@ -7,7 +7,11 @@ sub prettysuffix
 
 	return " C++0x" if ($suffix eq '_0x');
 	return " x64" if ($suffix eq '_x64');
+	return " CLR" if ($suffix eq '_clr');
+	return " CLR x64" if ($suffix eq '_clr_x64');
 	return " PPC" if ($suffix eq '_ppc');
+	return " WinCE" if ($suffix eq '_wince');
+	return " ARM" if ($suffix eq '_arm');
 
 	return "";
 }
@@ -31,6 +35,10 @@ sub prettytoolset
 	return "Sony PlayStation3 GCC" if ($toolset =~ /^ps3_gcc/);
 	return "Sony PlayStation3 SNC" if ($toolset =~ /^ps3_snc/);
 
+	return "Android NDK (GCC)" . ($1 eq '_stlport' ? " STLport" : "") if ($toolset =~ /^android(.*)$/);
+	return "bada SDK (GCC)" if ($toolset =~ /^bada$/);
+	return "BlackBerry NDK (GCC)" if ($toolset =~ /^blackberry$/);
+
 	$toolset;
 }
 
@@ -50,6 +58,12 @@ sub prettyplatform
 
 	return "x360" if ($toolset =~ /^xbox360/);
 	return "ps3" if ($toolset =~ /^ps3/);
+
+    return "arm" if ($toolset =~ /_arm$/);
+    return "arm" if ($toolset =~ /_wince$/);
+    return "arm" if ($toolset =~ /^android/);
+    return "arm" if ($toolset =~ /^bada/);
+    return "arm" if ($toolset =~ /^blackberry/);
 
 	return "win64" if ($platform =~ /MSWin32-x64/);
 	return "win32" if ($platform =~ /MSWin32/);
@@ -90,11 +104,15 @@ while (<>)
 
 		if ($info =~ /^prepare/)
 		{
-			$results{$fulltool}{$fullconf}{result} = 1;
+			$results{$fulltool}{$fullconf}{result} = "";
 		}
 		elsif ($info =~ /^success/)
 		{
-			$results{$fulltool}{$fullconf}{result} = 0;
+			$results{$fulltool}{$fullconf}{result} = "success";
+		}
+		elsif ($info =~ /^skiprun/)
+		{
+			$results{$fulltool}{$fullconf}{result} = "skiprun";
 		}
 		elsif ($info =~ /^coverage (\S+)/)
 		{
@@ -175,7 +193,7 @@ foreach $tool (@toolsetarray)
 		{
 			print "<td bgcolor='#cccccc'>&nbsp;</td>";
 		}
-		elsif ($$info{result} == 0)
+		elsif ($$info{result} eq "success")
 		{
 			my $coverage = $$info{coverage};
 
@@ -187,6 +205,10 @@ foreach $tool (@toolsetarray)
 			}
 
 			print "</td>";
+		}
+		elsif ($$info{result} eq "skiprun")
+		{
+			print "<td bgcolor='#ffff80' align='center'>pass</td>"
 		}
 		else
 		{

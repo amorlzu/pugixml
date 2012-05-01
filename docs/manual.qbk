@@ -1,9 +1,9 @@
 [book pugixml
     [quickbook 1.5]
 
-    [version 1.0]
+    [version 1.2]
     [id manual]
-    [copyright 2010 Arseny Kapoulkine]
+    [copyright 2012 Arseny Kapoulkine]
     [license Distributed under the MIT License]
 ]
 
@@ -60,7 +60,7 @@ Thanks to *Vyacheslav Egorov* for documentation proofreading.
 The pugixml library is distributed under the MIT license:
 
 [:
-Copyright (c) 2006-2010 Arseny Kapoulkine
+Copyright (c) 2006-2012 Arseny Kapoulkine
 
 Permission is hereby granted, free of charge, to any person
 obtaining a copy of this software and associated documentation
@@ -88,7 +88,7 @@ This means that you can freely use pugixml in your applications, both open-sourc
  
 [:
 This software is based on pugixml library (http://pugixml.org).'''<sbr />'''
-pugixml is Copyright (C) 2006-2010 Arseny Kapoulkine.
+pugixml is Copyright (C) 2006-2012 Arseny Kapoulkine.
 ]
 
 [endsect] [/license]
@@ -106,8 +106,8 @@ pugixml is distributed in source form. You can either download a source distribu
 You can download the latest source distribution via one of the following links:
 
 [pre
-[@http://pugixml.googlecode.com/files/pugixml-1.0.zip]
-[@http://pugixml.googlecode.com/files/pugixml-1.0.tar.gz]
+[@http://pugixml.googlecode.com/files/pugixml-1.2.zip]
+[@http://pugixml.googlecode.com/files/pugixml-1.2.tar.gz]
 ]
 
 The distribution contains library source, documentation (the manual you're reading now and the quick start guide) and some code examples. After downloading the distribution, install pugixml by extracting all files from the compressed archive. The files have different line endings depending on the archive format - [file .zip] archive has Windows line endings, [file .tar.gz] archive has Unix line endings. Otherwise the files in both archives are identical.
@@ -122,7 +122,7 @@ The Subversion repository is located at [@http://pugixml.googlecode.com/svn/]. T
 
 For example, to checkout the current version, you can use this command:
 
-[pre svn checkout http://pugixml.googlecode.com/svn/tags/release-1.0 pugixml]
+[pre svn checkout http://pugixml.googlecode.com/svn/tags/release-1.2 pugixml]
 
 To checkout the latest version, you can use this command:
 
@@ -200,6 +200,33 @@ It's possible to compile pugixml as a standalone shared library. The process is 
 [caution If you're using STL-related functions, you should use the shared runtime library to ensure that a single heap is used for STL allocations in your application and in pugixml; in MSVC, this means selecting the 'Multithreaded DLL' or 'Multithreaded Debug DLL' to 'Runtime library' property (/MD or /MDd linker switch). You should also make sure that your runtime library choice is consistent between different projects.]
 
 [endsect] [/shared]
+
+[#PUGIXML_HEADER_ONLY]
+[section:header Using pugixml in header-only mode]
+
+It's possible to use pugixml in header-only mode. This means that all source code for pugixml will be included in every translation unit that includes [file pugixml.hpp]. This is how most of Boost and STL libraries work.
+
+Note that there are advantages and drawbacks of this approach. Header mode may improve tree traversal/modification performance (because many simple functions will be inlined), if your compiler toolchain does not support link-time optimization, or if you have it turned off (with link-time optimization the performance should be similar to non-header mode). However, since compiler now has to compile pugixml source once for each translation unit that includes it, compilation times may increase noticeably. If you want to use pugixml in header mode but do not need XPath support, you can consider disabling it by using [link PUGIXML_NO_XPATH] define to improve compilation time.
+
+Enabling header-only mode is a two-step process:
+
+# You have to define `PUGIXML_HEADER_ONLY`
+# You have to include [file pugixml.cpp] whenever you include pugixml.hpp
+
+Both of these are best done via [file pugiconfig.hpp] like this:
+
+    #define PUGIXML_HEADER_ONLY
+    #include "pugixml.cpp"
+
+Note that it is safe to compile [file pugixml.cpp] if `PUGIXML_HEADER_ONLY` is defined - so if you want to i.e. use header-only mode only in Release configuration, you
+can include pugixml.cpp in your project (see [sref manual.install.building.embed]), and conditionally enable header-only mode in [file pugiconfig.hpp], i.e.:
+
+    #ifndef _DEBUG
+        #define PUGIXML_HEADER_ONLY
+        #include "pugixml.cpp"
+    #endif
+
+[endsect] [/header]
  
 [section:config Additional configuration options]
 
@@ -216,6 +243,8 @@ pugixml uses several defines to control the compilation process. There are two w
 [anchor PUGIXML_API], [anchor PUGIXML_CLASS] and [anchor PUGIXML_FUNCTION] defines let you specify custom attributes (i.e. declspec or calling conventions) for pugixml classes and non-member functions. In absence of `PUGIXML_CLASS` or `PUGIXML_FUNCTION` definitions, `PUGIXML_API` definition is used instead. For example, to specify fixed calling convention, you can define `PUGIXML_FUNCTION` to i.e. `__fastcall`. Another example is DLL import/export attributes in MSVC (see [sref manual.install.building.shared]).
 
 [note In that example `PUGIXML_API` is inconsistent between several source files; this is an exception to the consistency rule.]
+
+[anchor PUGIXML_MEMORY_PAGE_SIZE], [anchor PUGIXML_MEMORY_OUTPUT_STACK] and [anchor PUGIXML_MEMORY_XPATH_PAGE_SIZE] can be used to customize certain important sizes to optimize memory usage for the application-specific patterns. For details see [sref manual.dom.memory.tuning].
  
 [endsect] [/config]
 
@@ -230,16 +259,18 @@ pugixml is written in standard-compliant C++ with some compiler-specific workaro
     * Digital Mars C++ Compiler 8.51
     * Intel C++ Compiler 8.0, 9.0 x86/x64, 10.0 x86/x64, 11.0 x86/x64
     * Metrowerks CodeWarrior 8.0
-    * Microsoft Visual C++ 6.0, 7.0 (2002), 7.1 (2003), 8.0 (2005) x86/x64, 9.0 (2008) x86/x64, 10.0 (2010) x86/x64
+    * Microsoft Visual C++ 6.0, 7.0 (2002), 7.1 (2003), 8.0 (2005) x86/x64, 9.0 (2008) x86/x64, 10.0 (2010) x86/x64, 11.0 x86/x64/ARM and some CLR versions
     * MinGW (GCC) 3.4, 4.4, 4.5, 4.6 x64
 
 * Linux (GCC 4.4.3 x86/x64)
 * FreeBSD (GCC 4.2.1 x86/x64)
 * Apple MacOSX (GCC 4.0.1 x86/x64/PowerPC)
+* Sun Solaris (sunCC x86/x64)
 * Microsoft Xbox 360
 * Nintendo Wii (Metrowerks CodeWarrior 4.1)
 * Sony Playstation Portable (GCC 3.4.2)
 * Sony Playstation 3 (GCC 4.1.1, SNC 310.1)
+* Various portable platforms (Android NDK, BlackBerry NDK, Samsung bada, Windows CE)
 
 [endsect] [/portability]
 
@@ -265,11 +296,11 @@ The tree nodes can be of one of the following types (which together form the enu
 
 [:There are two element nodes here: one has name `"node"`, single attribute `"attr"` and single child `"child"`, another has name `"child"` and does not have any attributes or child nodes.]
 
-* Plain character data nodes ([anchor node_pcdata]) represent plain text in XML. PCDATA nodes have a value, but do not have a name or children/attributes. Note that plain character data is not a part of the element node but instead has its own node; for example, an element node can have several child PCDATA nodes. The example XML representation of text nodes is as follows:
+* Plain character data nodes ([anchor node_pcdata]) represent plain text in XML. PCDATA nodes have a value, but do not have a name or children/attributes. Note that *plain character data is not a part of the element node but instead has its own node*; an element node can have several child PCDATA nodes. The example XML representation of text nodes is as follows:
 
     <node> text1 <child/> text2 </node>
 
-[:Here `"node"` element has three children, two of which are PCDATA nodes with values `"text1"` and `"text2"`.]
+[:Here `"node"` element has three children, two of which are PCDATA nodes with values `" text1 "` and `" text2 "`.]
 
 * Character data nodes ([anchor node_cdata]) represent text in XML that is quoted in a special way. CDATA nodes do not differ from PCDATA nodes except in XML representation - the above text example looks like this with CDATA:
 
@@ -483,6 +514,22 @@ When setting new memory management functions, care must be taken to make sure th
 
 [endsect] [/custom]
 
+[section:tuning Memory consumption tuning]
+
+There are several important buffering optimizations in pugixml that rely on predefined constants. These constants have default values that were tuned for common usage patterns; for some applications, changing these constants might improve memory consumption or increase performance. Changing these constants is not recommended unless their default values result in visible problems.
+
+These constants can be tuned via configuration defines, as discussed in [sref manual.install.building.config]; it is recommended to set them in [file pugiconfig.hpp].
+
+* `PUGIXML_MEMORY_PAGE_SIZE` controls the page size for document memory allocation. Memory for node/attribute objects is allocated in pages of the specified size. The default size is 32 Kb; for some applications the size is too large (i.e. embedded systems with little heap space or applications that keep lots of XML documents in memory). A minimum size of 1 Kb is recommended.
+[lbr]
+
+* `PUGIXML_MEMORY_OUTPUT_STACK` controls the cumulative stack space required to output the node. Any output operation (i.e. saving a subtree to file) uses an internal buffering scheme for performance reasons. The default size is 10 Kb; if you're using node output from threads with little stack space, decreasing this value can prevent stack overflows. A minimum size of 1 Kb is recommended.
+[lbr]
+
+* `PUGIXML_MEMORY_XPATH_PAGE_SIZE` controls the page size for XPath memory allocation. Memory for XPath query objects as well as internal memory for XPath evaluation is allocated in pages of the specified size. The default size is 4 Kb; if you have a lot of resident XPath query objects, you might need to decrease the size to improve memory consumption. A minimum size of 256 bytes is recommended.
+
+[endsect] [/tuning]
+
 [section:internals Document memory management internals]
 
 Constructing a document object using the default constructor does not result in any allocations; document node is stored inside the [link xml_document] object.
@@ -577,8 +624,6 @@ This is a simple example of loading XML document from file using streams ([@samp
 [import samples/load_stream.cpp]
 [code_load_stream]
 
-Stream loading requires working seek/tell functions and therefore may fail when used with some stream implementations like gzstream.
-
 [endsect] [/stream]
 
 [section:errors Handling parsing errors]
@@ -618,7 +663,7 @@ Parsing status is represented as the `xml_parse_status` enumeration and can be o
 * [anchor status_end_element_mismatch] means that parsing stopped because the closing tag did not match the opening one (i.e. `<node></nedo>`) or because some tag was not closed at all
 
 [#xml_parse_result::description]
-`description()` member function can be used to convert parsing status to a string; the returned message is always in English, so you'll have to write your own function if you need a localized string. However please note that the exact messages returned by `description()` function may change from version to version, so any complex status handling should be based on `status` value.
+`description()` member function can be used to convert parsing status to a string; the returned message is always in English, so you'll have to write your own function if you need a localized string. However please note that the exact messages returned by `description()` function may change from version to version, so any complex status handling should be based on `status` value. Note that `description()` returns a `char` string even in `PUGIXML_WCHAR_MODE`; you'll have to call [link as_wide] to get the `wchar_t` string.
 
 If parsing failed because the source data was not a valid XML, the resulting tree is not destroyed - despite the fact that load function returns error, you can use the part of the tree that was successfully parsed. Obviously, the last element may have an unexpected name/value; for example, if the attribute value does not end with the necessary quotation mark, like in [^<node attr="value>some data</node>] example, the value of attribute `attr` will contain the string `value>some data</node>`.
 
@@ -664,6 +709,9 @@ These flags control the resulting tree contents:
 [lbr]
 
 * [anchor parse_ws_pcdata] determines if PCDATA nodes (nodes with type [link node_pcdata]) that consist only of whitespace characters are to be put in DOM tree. Often whitespace-only data is not significant for the application, and the cost of allocating and storing such nodes (both memory and speed-wise) can be significant. For example, after parsing XML string `<node> <a/> </node>`, `<node>` element will have three children when `parse_ws_pcdata` is set (child with type [link node_pcdata] and value `" "`, child with type [link node_element] and name `"a"`, and another child with type [link node_pcdata] and value `" "`), and only one child when `parse_ws_pcdata` is not set. This flag is *off* by default.
+[lbr]
+
+* [anchor parse_ws_pcdata_single] determines if whitespace-only PCDATA nodes that have no sibling nodes are to be put in DOM tree. In some cases application needs to parse the whitespace-only contents of nodes, i.e. `<node>  </node>`, but is not interested in whitespace markup elsewhere. It is possible to use [link parse_ws_pcdata] flag in this case, but it results in excessive allocations and complicates document processing in some cases; this flag is intended to avoid that. As an example, after parsing XML string `<node> <a>  </a> </node>` with `parse_ws_pcdata_single` flag set, `<node>` element will have one child `<a>`, and `<a>` element will have one child with type [link node_pcdata] and value `"  "`. This flag has no effect if [link parse_ws_pcdata] is enabled. This flag is *off* by default.
 
 These flags control the transformation of tree element contents:
 
@@ -676,7 +724,7 @@ These flags control the transformation of tree element contents:
 * [anchor parse_wconv_attribute] determines if attribute value normalization should be performed for all attributes. This means, that whitespace characters (new line, tab and space) are replaced with space (`' '`). New line characters are always treated as if [link parse_eol] is set, i.e. `\r\n` is converted to a single space.  This flag is *on* by default.
 [lbr]
 
-* [anchor parse_wnorm_attribute] determines if extended attribute value normalization should be performed for all attributes. This means, that after attribute values are normalized as if [link parse_wconv_attribute] was set, leading and trailing space characters are removed, and all sequences of space characters are replaced by a single space character. The value of [link parse_wconv_attribute] has no effect if this flag is on. This flag is *off* by default.
+* [anchor parse_wnorm_attribute] determines if extended attribute value normalization should be performed for all attributes. This means, that after attribute values are normalized as if [link parse_wconv_attribute] was set, leading and trailing space characters are removed, and all sequences of space characters are replaced by a single space character. [link parse_wconv_attribute] has no effect if this flag is on. This flag is *off* by default.
 
 [note `parse_wconv_attribute` option performs transformations that are required by W3C specification for attributes that are declared as [^CDATA]; [link parse_wnorm_attribute] performs transformations required for [^NMTOKENS] attributes. In the absence of document type declaration all attributes should behave as if they are declared as [^CDATA], thus [link parse_wconv_attribute] is the default option.]
 
@@ -721,6 +769,7 @@ pugixml supports all popular Unicode encodings (UTF-8, UTF-16 (big and little en
 * [anchor encoding_utf32_be] corresponds to big-endian UTF-32 encoding as defined in the Unicode standard.
 * [anchor encoding_utf32] corresponds to UTF-32 encoding as defined in the Unicode standard; the endianness is assumed to be that of the target platform.
 * [anchor encoding_wchar] corresponds to the encoding of `wchar_t` type; it has the same meaning as either `encoding_utf16` or `encoding_utf32`, depending on `wchar_t` size.
+* [anchor encoding_latin1] corresponds to ISO-8859-1 encoding (also known as Latin-1).
 
 The algorithm used for `encoding_auto` correctly detects any supported Unicode encoding for all well-formed XML documents (since they start with document declaration) and for all other XML documents that start with [^<]; if your XML document does not start with [^<] and has encoding that is different from UTF-8, use the specific encoding.
 
@@ -793,12 +842,15 @@ Apart from structural information (parent, child nodes, attributes), nodes can h
 In case node does not have a name or value or if the node handle is null, both functions return empty strings - they never return null pointers.
 
 [#xml_node::child_value]
-It is common to store data as text contents of some node - i.e. `<node><description>This is a node</description></node>`. In this case, `<description>` node does not have a value, but instead has a child of type [link node_pcdata] with value `"This is a node"`. pugixml provides two helper functions to parse such data:
+It is common to store data as text contents of some node - i.e. `<node><description>This is a node</description></node>`. In this case, `<description>` node does not have a value, but instead has a child of type [link node_pcdata] with value `"This is a node"`. pugixml provides several helper functions to parse such data:
 
     const char_t* xml_node::child_value() const;
     const char_t* xml_node::child_value(const char_t* name) const;
+    xml_text xml_node::text() const;
 
 `child_value()` returns the value of the first child with type [link node_pcdata] or [link node_cdata]; `child_value(name)` is a simple wrapper for `child(name).child_value()`. For the above example, calling `node.child_value("description")` and `description.child_value()` will both produce string `"This is a node"`. If there is no child with relevant type, or if the handle is null, `child_value` functions return empty string.
+
+`text()` returns a special object that can be used for working with PCDATA contents in more complex cases than just retrieving the value; it is described in [sref manual.access.text] sections.
 
 There is an example of using some of these functions [link code_traverse_base_data at the end of the next section].
 
@@ -814,22 +866,29 @@ All attributes have name and value, both of which are strings (value may be empt
 
 In case the attribute handle is null, both functions return empty strings - they never return null pointers.
 
+[#xml_attribute::as_string]
+If you need a non-empty string if the attribute handle is null (for example, you need to get the option value from XML attribute, but if it is not specified, you need it to default to `"sorted"` instead of `""`), you can use `as_string` accessor:
+
+    const char_t* xml_attribute::as_string(const char_t* def = "") const;
+
+It returns `def` argument if the attribute handle is null. If you do not specify the argument, the function is equivalent to `value()`.
+
 [#xml_attribute::as_int][#xml_attribute::as_uint][#xml_attribute::as_double][#xml_attribute::as_float][#xml_attribute::as_bool]
 In many cases attribute values have types that are not strings - i.e. an attribute may always contain values that should be treated as integers, despite the fact that they are represented as strings in XML. pugixml provides several accessors that convert attribute value to some other type:
 
-    int xml_attribute::as_int() const;
-    unsigned int xml_attribute::as_uint() const;
-    double xml_attribute::as_double() const;
-    float xml_attribute::as_float() const;
-    bool xml_attribute::as_bool() const;
+    int xml_attribute::as_int(int def = 0) const;
+    unsigned int xml_attribute::as_uint(unsigned int def = 0) const;
+    double xml_attribute::as_double(double def = 0) const;
+    float xml_attribute::as_float(float def = 0) const;
+    bool xml_attribute::as_bool(bool def = false) const;
 
-`as_int`, `as_uint`, `as_double` and `as_float` convert attribute values to numbers. If attribute handle is null or attribute value is empty, `0` is returned. Otherwise, all leading whitespace characters are truncated, and the remaining string is parsed as a decimal number (`as_int` or `as_uint`) or as a floating point number in either decimal or scientific form (`as_double` or `as_float`). Any extra characters are silently discarded, i.e. `as_int` will return `1` for string `"1abc"`.
+`as_int`, `as_uint`, `as_double` and `as_float` convert attribute values to numbers. If attribute handle is null or attribute value is empty, `def` argument is returned (which is 0 by default). Otherwise, all leading whitespace characters are truncated, and the remaining string is parsed as a decimal number (`as_int` or `as_uint`) or as a floating point number in either decimal or scientific form (`as_double` or `as_float`). Any extra characters are silently discarded, i.e. `as_int` will return `1` for string `"1abc"`.
 
 In case the input string contains a number that is out of the target numeric range, the result is undefined.
 
 [caution Number conversion functions depend on current C locale as set with `setlocale`, so may return unexpected results if the locale is different from `"C"`.]
 
-`as_bool` converts attribute value to boolean as follows: if attribute handle is null or attribute value is empty, `false` is returned. Otherwise, `true` is returned if the first character is one of `'1', 't', 'T', 'y', 'Y'`. This means that strings like `"true"` and `"yes"` are recognized as `true`, while strings like `"false"` and `"no"` are recognized as `false`. For more complex matching you'll have to write your own function.
+`as_bool` converts attribute value to boolean as follows: if attribute handle is null, `def` argument is returned (which is `false` by default). If attribute value is empty, `false` is returned. Otherwise, `true` is returned if the first character is one of `'1', 't', 'T', 'y', 'Y'`. This means that strings like `"true"` and `"yes"` are recognized as `true`, while strings like `"false"` and `"no"` are recognized as `false`. For more complex matching you'll have to write your own function.
 
 [note There are no portable 64-bit types in C++, so there is no corresponding conversion function. If your platform has a 64-bit integer, you can easily write a conversion function yourself.]
 
@@ -871,6 +930,24 @@ This is an example of using these functions ([@samples/traverse_base.cpp]):
 [code_traverse_base_contents]
 
 [endsect] [/contents]
+
+[section:rangefor Range-based for-loop support]
+
+[#xml_node::children][#xml_node::attributes]
+If your C++ compiler supports range-based for-loop (this is a C++11 feature, at the time of writing it's supported by Microsoft Visual Studio 11 Beta, GCC 4.6 and Clang 3.0), you can use it to enumerate nodes/attributes. Additional helpers are provided to support this; note that they are also compatible with [@http://www.boost.org/libs/foreach/ Boost Foreach], and possibly other pre-C++11 foreach facilities.
+
+    ``/implementation-defined type/`` xml_node::children() const;
+    ``/implementation-defined type/`` xml_node::children(const char_t* name) const;
+    ``/implementation-defined type/`` xml_node::attributes() const;
+
+`children` function allows you to enumerate all child nodes; `children` function with `name` argument allows you to enumerate all child nodes with a specific name; `attributes` function allows you to enumerate all attributes of the node. Note that you can also use node object itself in a range-based for construct, which is equivalent to using `children()`.
+
+This is an example of using these functions ([@samples/traverse_rangefor.cpp]):
+
+[import samples/traverse_rangefor.cpp]
+[code_traverse_rangefor]
+
+[endsect] [/rangefor]
 
 [section:iterators Traversing node/attribute lists via iterators]
 
@@ -964,6 +1041,57 @@ This is an example of using predicate-based functions ([@samples/traverse_predic
 [code_traverse_predicate_find]
 
 [endsect] [/predicate]
+
+[section:text Working with text contents]
+
+[#xml_text]
+It is common to store data as text contents of some node - i.e. `<node><description>This is a node</description></node>`. In this case, `<description>` node does not have a value, but instead has a child of type [link node_pcdata] with value `"This is a node"`. pugixml provides a special class, `xml_text`, to work with such data. Working with text objects to modify data is described in [link manual.modify.text the documentation for modifying document data]; this section describes the access interface of `xml_text`.
+
+[#xml_node::text]
+You can get the text object from a node by using `text()` method:
+    
+    xml_text xml_node::text() const;
+
+If the node has a type `node_pcdata` or `node_cdata`, then the node itself is used to return data; otherwise, a first child node of type `node_pcdata` or `node_cdata` is used.
+
+[#xml_text::empty]
+[#xml_text::unspecified_bool_type]
+You can check if the text object is bound to a valid PCDATA/CDATA node by using it as a boolean value, i.e. `if (text) { ... }` or `if (!text) { ... }`. Alternatively you can check it by using the `empty()` method:
+
+    bool xml_text::empty() const;
+
+[#xml_text::get]
+Given a text object, you can get the contents (i.e. the value of PCDATA/CDATA node) by using the following function:
+
+    const char_t* xml_text::get() const;
+
+In case text object is empty, the function returns an empty string - it never returns a null pointer.
+
+[#xml_text::as_string][#xml_text::as_int][#xml_text::as_uint][#xml_text::as_double][#xml_text::as_float][#xml_text::as_bool]
+If you need a non-empty string if the text object is empty, or if the text contents is actually a number or a boolean that is stored as a string, you can use the following accessors:
+
+    const char_t* xml_text::as_string(const char_t* def = "") const;
+    int xml_text::as_int(int def = 0) const;
+    unsigned int xml_text::as_uint(unsigned int def = 0) const;
+    double xml_text::as_double(double def = 0) const;
+    float xml_text::as_float(float def = 0) const;
+    bool xml_text::as_bool(bool def = false) const;
+
+All of the above functions have the same semantics as similar `xml_attribute` members: they return the default argument if the text object is empty, they convert the text contents to a target type using the same rules and restrictions. You can [link xml_attribute::as_int refer to documentation for the attribute functions] for details.
+
+[#xml_text::data]
+`xml_text` is essentially a helper class that operates on `xml_node` values. It is bound to a node of type [link node_pcdata] or [link node_cdata]. You can use the following function to retrieve this node:
+
+    xml_node xml_text::data() const;
+
+Essentially, assuming `text` is an `xml_text` object, calling `text.get()` is equivalent to calling `text.data().value()`.
+
+This is an example of using `xml_text` object ([@samples/text.cpp]):
+
+[import samples/text.cpp]
+[code_text_access]
+
+[endsect] [/text]
 
 [section:misc Miscellaneous functions]
 
@@ -1140,6 +1268,45 @@ This is an example of removing attributes\/nodes from the document ([@samples/mo
 
 [endsect] [/remove]
 
+[section:text Working with text contents]
+
+pugixml provides a special class, `xml_text`, to work with text contents stored as a value of some node, i.e. `<node><description>This is a node</description></node>`. Working with text objects to retrieve data is described in [link manual.access.text the documentation for accessing document data]; this section describes the modification interface of `xml_text`.
+
+[#xml_text::set]
+Once you have an `xml_text` object, you can set the text contents using the following function:
+
+    bool xml_text::set(const char_t* rhs);
+
+This function tries to set the contents to the specified string, and returns the operation result. The operation fails if the text object was retrieved from a node that can not have a value and is not an element node (i.e. it is a [link node_declaration] node), if the text object is empty, or if there is insufficient memory to handle the request. The provided string is copied into document managed memory and can be destroyed after the function returns (for example, you can safely pass stack-allocated buffers to this function). Note that if the text object was retrieved from an element node, this function creates the PCDATA child node if necessary (i.e. if the element node does not have a PCDATA/CDATA child already).
+
+[#xml_text::set_value]
+In addition to a string function, several functions are provided for handling text with numbers and booleans as contents:
+
+    bool xml_text::set(int rhs);
+    bool xml_text::set(unsigned int rhs);
+    bool xml_text::set(double rhs);
+    bool xml_text::set(bool rhs);
+    
+The above functions convert the argument to string and then call the base `set` function. These functions have the same semantics as similar `xml_attribute` functions. You can [link xml_attribute::set_value refer to documentation for the attribute functions] for details.
+
+[#xml_text::assign]
+
+For convenience, all `set` functions have the corresponding assignment operators:
+
+    xml_text& xml_text::operator=(const char_t* rhs);
+    xml_text& xml_text::operator=(int rhs);
+    xml_text& xml_text::operator=(unsigned int rhs);
+    xml_text& xml_text::operator=(double rhs);
+    xml_text& xml_text::operator=(bool rhs);
+
+These operators simply call the right `set` function and return the attribute they're called on; the return value of `set` is ignored, so errors are ignored.
+
+This is an example of using `xml_text` object to modify text contents ([@samples/text.cpp]):
+
+[code_text_modify]
+
+[endsect] [/text]
+
 [section:clone Cloning nodes/attributes]
 
 [#xml_node::prepend_copy][#xml_node::append_copy][#xml_node::insert_copy_after][#xml_node::insert_copy_before]
@@ -1178,7 +1345,7 @@ This is an example with one possible implementation of include tags in XML ([@sa
 
 Often after creating a new document or loading the existing one and processing it, it is necessary to save the result back to file. Also it is occasionally useful to output the whole document or a subtree to some stream; use cases include debug printing, serialization via network or other text-oriented medium, etc. pugixml provides several functions to output any subtree of the document to a file, stream or another generic transport interface; these functions allow to customize the output format (see [sref manual.saving.options]), and also perform necessary encoding conversions (see [sref manual.saving.encoding]). This section documents the relevant functionality.
 
-Before writing to the destination the node/attribute data is properly formatted according to the node type; all special XML symbols, such as < and &, are properly escaped. In order to guard against forgotten node/attribute names, empty node/attribute names are printed as `":anonymous"`. For well-formed output, make sure all node and attribute names are set to meaningful values.
+Before writing to the destination the node/attribute data is properly formatted according to the node type; all special XML symbols, such as < and &, are properly escaped (unless [link format_no_escapes] flag is set). In order to guard against forgotten node/attribute names, empty node/attribute names are printed as `":anonymous"`. For well-formed output, make sure all node and attribute names are set to meaningful values.
 
 CDATA sections with values that contain `"]]>"` are split into several sections as follows: section with value `"pre]]>post"` is written as `<![CDATA[pre]]]]><![CDATA[>post]]>`. While this alters the structure of the document (if you load the document after saving it, there will be two CDATA sections instead of one), this is the only way to escape CDATA contents.
 
@@ -1238,9 +1405,9 @@ All of the above saving functions are implemented in terms of writer interface. 
 
     void xml_document::save(xml_writer& writer, const char_t* indent = "\t", unsigned int flags = format_default, xml_encoding encoding = encoding_auto) const;
 
-In order to output the document via some custom transport, for example sockets, you should create an object which implements `xml_writer_file` interface and pass it to `save` function. `xml_writer_file::write` function is called with a buffer as an input, where `data` points to buffer start, and `size` is equal to the buffer size in bytes. `write` implementation must write the buffer to the transport; it can not save the passed buffer pointer, as the buffer contents will change after `write` returns. The buffer contains the chunk of document data in the desired encoding.
+In order to output the document via some custom transport, for example sockets, you should create an object which implements `xml_writer` interface and pass it to `save` function. `xml_writer::write` function is called with a buffer as an input, where `data` points to buffer start, and `size` is equal to the buffer size in bytes. `write` implementation must write the buffer to the transport; it can not save the passed buffer pointer, as the buffer contents will change after `write` returns. The buffer contains the chunk of document data in the desired encoding.
 
-`write` function is called with relatively large blocks (size is usually several kilobytes, except for the first block with BOM, which is output only if [link format_write_bom] is set, and last block, which may be small), so there is often no need for additional buffering in the implementation.
+`write` function is called with relatively large blocks (size is usually several kilobytes, except for the last block that may be small), so there is often no need for additional buffering in the implementation.
 
 This is a simple example of custom writer for saving document data to STL string ([@samples/save_custom_writer.cpp]); read the sample code for more complex examples:
 
@@ -1279,6 +1446,9 @@ These flags control the resulting tree contents:
 [lbr]
 
 * [anchor format_raw] switches between formatted and raw output. If this flag is on, the nodes are not indented in any way, and also no newlines that are not part of document text are printed. Raw mode can be used for serialization where the result is not intended to be read by humans; also it can be useful if the document was parsed with [link parse_ws_pcdata] flag, to preserve the original document formatting as much as possible. This flag is *off* by default.
+[lbr]
+
+* [anchor format_no_escapes] disables output escaping for attribute values and PCDATA contents. If this flag is on, special symbols (', &, <, >) and all non-printable characters (those with codepoint values less than 32) are converted to XML escape sequences (i.e. &amp;) during output. If this flag is off, no text processing is performed; therefore, output XML can be malformed if output contents contains invalid symbols (i.e. having a stray < in the PCDATA will make the output malformed). This flag is *on* by default.
 
 These flags control the additional output information:
 
@@ -1286,6 +1456,9 @@ These flags control the additional output information:
 [lbr]
 
 * [anchor format_write_bom] enables Byte Order Mark (BOM) output. By default, no BOM is output, so in case of non UTF-8 encodings the resulting document's encoding may not be recognized by some parsers and text editors, if they do not implement sophisticated encoding detection. Enabling this flag adds an encoding-specific BOM to the output. This flag has no effect in `xml_node::print` functions: they never output the BOM. This flag is *off* by default.
+
+* [anchor format_save_file_text] changes the file mode when using `save_file` function. By default, file is opened in binary mode, which means that the output file will
+contain platform-independent newline \\n (ASCII 10). If this flag is on, file is opened in text mode, which on some systems changes the newline format (i.e. on Windows you can use this flag to output XML documents with \\r\\n (ASCII 13 10) newlines. This flag is *off* by default.
 
 Additionally, there is one predefined option mask:
 
@@ -1309,6 +1482,21 @@ Also note that wide stream saving functions do not have `encoding` argument and 
 [note The current behavior for Unicode conversion is to skip all invalid UTF sequences during conversion. This behavior should not be relied upon; if your node/attribute names do not contain any valid UTF sequences, they may be output as if they are empty, which will result in malformed XML document.]
 
 [endsect] [/encoding]
+
+[section:declaration Customizing document declaration]
+
+When you are saving the document using `xml_document::save()` or `xml_document::save_file()`, a default XML document declaration is output, if `format_no_declaration` is not specified and if the document does not have a declaration node. However, the default declaration is not customizable. If you want to customize the declaration output, you need to create the declaration node yourself.
+
+[note By default the declaration node is not added to the document during parsing. If you just need to preserve the original declaration node, you have to add the flag [link parse_declaration] to the parsing flags; the resulting document will contain the original declaration node, which will be output during saving.]
+
+Declaration node is a node with type [link node_declaration]; it behaves like an element node in that it has attributes with values (but it does not have child nodes). Therefore setting custom version, encoding or standalone declaration involves adding attributes and setting attribute values.
+
+This is an example that shows how to create a custom declaration node ([@samples/save_declaration.cpp]):
+
+[import samples/save_declaration.cpp]
+[code_save_declaration]
+
+[endsect] [/declaration]
 
 [endsect] [/saving]
 
@@ -1583,7 +1771,7 @@ The information about parsing result is returned via `xpath_parse_result` object
 Parsing result is represented as the error message; it is either a null pointer, in case there is no error, or the error message in the form of ASCII zero-terminated string.
 
 [#xpath_parse_result::description]
-`description()` member function can be used to get the error message; it never returns the null pointer, so you can safely use description() even if query parsing succeeded.
+`description()` member function can be used to get the error message; it never returns the null pointer, so you can safely use `description()` even if query parsing succeeded. Note that `description()` returns a `char` string even in `PUGIXML_WCHAR_MODE`; you'll have to call [link as_wide] to get the `wchar_t` string.
 
 [#xpath_parse_result::offset]
 In addition to the error message, parsing result has an `offset` member, which contains the offset of last successfully parsed character. This offset is in units of [link char_t pugi::char_t] (bytes for character mode, wide characters for wide character mode).
@@ -1613,6 +1801,34 @@ Because of the differences in document object models, performance considerations
 [endsect] [/xpath]
 
 [section:changes Changelog]
+
+[h5 1.05.2012 - version 1.2]
+
+Major release, featuring header-only mode, various interface enhancements (i.e. PCDATA manipulation and C++11 iteration), many other features and compatibility improvements.
+
+* New features:
+    # Added xml_text helper class for working with PCDATA/CDATA contents of an element node
+    # Added optional header-only mode (controlled by PUGIXML_HEADER_ONLY define)
+    # Added xml_node::children() and xml_node::attributes() for C++11 ranged for loop or BOOST_FOREACH
+    # Added support for Latin-1 (ISO-8859-1) encoding conversion during loading and saving
+    # Added custom default values for '''xml_attribute::as_*''' (they are returned if the attribute does not exist)
+    # Added parse_ws_pcdata_single flag for preserving whitespace-only PCDATA in case it's the only child
+    # Added format_save_file_text for xml_document::save_file to open files as text instead of binary (changes newlines on Windows)
+    # Added format_no_escapes flag to disable special symbol escaping (complements ~parse_escapes)
+    # Added support for loading document from streams that do not support seeking
+    # Added '''PUGIXML_MEMORY_*''' constants for tweaking allocation behavior (useful for embedded systems)
+    # Added PUGIXML_VERSION preprocessor define
+
+* Compatibility improvements:
+    # Parser does not require setjmp support (improves compatibility with some embedded platforms, enables clr:pure compilation)
+    # STL forward declarations are no longer used (fixes SunCC/RWSTL compilation, fixes clang compilation in C++11 mode)
+    # Fixed AirPlay SDK, Android, Windows Mobile (WinCE) and C++/CLI compilation
+    # Fixed several compilation warnings for various GCC versions, Intel C++ compiler and Clang
+
+* Bug fixes:
+    # Fixed unsafe bool conversion to avoid problems on C++/CLI
+    # Iterator dereference operator is const now (fixes Boost filter_iterator support)
+    # xml_document::save_file now checks for file I/O errors during saving
 
 [h5 1.11.2010 - version 1.0]
 
@@ -1862,6 +2078,10 @@ Macros:
 * `#define `[link PUGIXML_API]
 * `#define `[link PUGIXML_CLASS]
 * `#define `[link PUGIXML_FUNCTION]
+* `#define `[link PUGIXML_MEMORY_PAGE_SIZE]
+* `#define `[link PUGIXML_MEMORY_OUTPUT_STACK]
+* `#define `[link PUGIXML_MEMORY_XPATH_PAGE_SIZE]
+* `#define `[link PUGIXML_HEADER_ONLY]
 
 Types:
 
@@ -1912,6 +2132,7 @@ Enumerations:
     * [link encoding_utf32_be]
     * [link encoding_utf32]
     * [link encoding_wchar]
+    * [link encoding_latin1]
     [lbr]
 
 * `enum `[link xpath_value_type]
@@ -1927,7 +2148,9 @@ Constants:
     * [link format_default]
     * [link format_indent]
     * [link format_no_declaration]
+    * [link format_no_escapes]
     * [link format_raw]
+    * [link format_save_file_text]
     * [link format_write_bom]
     [lbr]
 
@@ -1943,6 +2166,7 @@ Constants:
     * [link parse_minimal]
     * [link parse_pi]
     * [link parse_ws_pcdata]
+    * [link parse_ws_pcdata_single]
     * [link parse_wconv_attribute]
     * [link parse_wnorm_attribute]
         
@@ -1975,11 +2199,12 @@ Classes:
     * `const char_t* `[link xml_attribute::value value]`() const;`
     [lbr]
 
-    * `int `[link xml_attribute::as_int as_int]`() const;`
-    * `unsigned int `[link xml_attribute::as_uint as_uint]`() const;`
-    * `double `[link xml_attribute::as_double as_double]`() const;`
-    * `float `[link xml_attribute::as_float as_float]`() const;`
-    * `bool `[link xml_attribute::as_bool as_bool]`() const;`
+    * `const char_t* `[link xml_attribute::as_string as_string]`(const char_t* def = "") const;`
+    * `int `[link xml_attribute::as_int as_int]`(int def = 0) const;`
+    * `unsigned int `[link xml_attribute::as_uint as_uint]`(unsigned int def = 0) const;`
+    * `double `[link xml_attribute::as_double as_double]`(double def = 0) const;`
+    * `float `[link xml_attribute::as_float as_float]`(float def = 0) const;`
+    * `bool `[link xml_attribute::as_bool as_bool]`(bool def = false) const;`
     [lbr]
 
     * `bool `[link xml_attribute::set_name set_name]`(const char_t* rhs);`
@@ -2034,6 +2259,11 @@ Classes:
     * `xml_attribute `[link xml_node::last_attribute last_attribute]`() const;`
     [lbr]
 
+    * /implementation-defined type/ [link xml_node::children children]`() const;`
+    * /implementation-defined type/ [link xml_node::children children]`(const char_t* name) const;`
+    * /implementation-defined type/ [link xml_node::attributes attributes]`() const;`
+    [lbr]
+
     * `xml_node `[link xml_node::child child]`(const char_t* name) const;`
     * `xml_attribute `[link xml_node::attribute attribute]`(const char_t* name) const;`
     * `xml_node `[link xml_node::next_sibling_name next_sibling]`(const char_t* name) const;`
@@ -2044,6 +2274,7 @@ Classes:
 
     * `const char_t* `[link xml_node::child_value child_value]`() const;`
     * `const char_t* `[link xml_node::child_value child_value]`(const char_t* name) const;`
+    * `xml_text `[link xml_node::text text]`() const;`
     [lbr]
 
     * `typedef xml_node_iterator `[link xml_node_iterator iterator]`;`
@@ -2181,6 +2412,41 @@ Classes:
     [lbr]
 
     * `int `[link xml_tree_walker::depth depth]`() const;`
+    [lbr]
+
+* `class `[link xml_text]
+    * `bool `[link xml_text::empty empty]`() const;`
+    * `operator `[link xml_text::unspecified_bool_type]`() const;`
+    [lbr]
+
+    * `const char_t* `[link xml_text::get]`() const;`
+    [lbr]
+
+    * `const char_t* `[link xml_text::as_string as_string]`(const char_t* def = "") const;`
+    * `int `[link xml_text::as_int as_int]`(int def = 0) const;`
+    * `unsigned int `[link xml_text::as_uint as_uint]`(unsigned int def = 0) const;`
+    * `double `[link xml_text::as_double as_double]`(double def = 0) const;`
+    * `float `[link xml_text::as_float as_float]`(float def = 0) const;`
+    * `bool `[link xml_text::as_bool as_bool]`(bool def = false) const;`
+    [lbr]
+
+    * `bool `[link xml_text::set set]`(const char_t* rhs);`
+    [lbr]
+
+    * `bool `[link xml_text::set set]`(int rhs);`
+    * `bool `[link xml_text::set set]`(unsigned int rhs);`
+    * `bool `[link xml_text::set set]`(double rhs);`
+    * `bool `[link xml_text::set set]`(bool rhs);`
+    [lbr]
+
+    * `xml_text& `[link xml_text::assign operator=]`(const char_t* rhs);`
+    * `xml_text& `[link xml_text::assign operator=]`(int rhs);`
+    * `xml_text& `[link xml_text::assign operator=]`(unsigned int rhs);`
+    * `xml_text& `[link xml_text::assign operator=]`(double rhs);`
+    * `xml_text& `[link xml_text::assign operator=]`(bool rhs);`
+    [lbr]
+
+    * `xml_node `[link xml_text::data data]`() const;`
     [lbr]
 
 * `class `[link xml_writer]

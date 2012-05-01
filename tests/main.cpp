@@ -1,10 +1,20 @@
 #include "test.hpp"
 #include "allocator.hpp"
 
-#include <exception>
 #include <stdio.h>
+#include <stdlib.h>
 #include <float.h>
 #include <assert.h>
+
+#ifndef PUGIXML_NO_EXCEPTIONS
+#   include <exception>
+#endif
+
+#ifdef _WIN32_WCE
+#   undef DebugBreak
+#   pragma warning(disable: 4201) // nonstandard extension used: nameless struct/union
+#   include <windows.h>
+#endif
 
 test_runner* test_runner::_tests = 0;
 size_t test_runner::_memory_fail_threshold = 0;
@@ -52,6 +62,8 @@ static void replace_memory_management()
 }
 
 #if defined(_MSC_VER) && _MSC_VER > 1200 && _MSC_VER < 1400 && !defined(__INTEL_COMPILER) && !defined(__DMC__)
+#include <exception>
+
 namespace std
 {
 	_CRTIMP2 _Prhand _Raise_handler;
@@ -72,6 +84,7 @@ static bool run_test(test_runner* test)
 #ifdef _MSC_VER
 #	pragma warning(push)
 #	pragma warning(disable: 4611) // interaction between _setjmp and C++ object destruction is non-portable
+#   pragma warning(disable: 4793) // function compiled as native: presence of '_setjmp' makes a function unmanaged
 #endif
 
 		volatile int result = setjmp(test_runner::_failure_buffer);
@@ -90,7 +103,7 @@ static bool run_test(test_runner* test)
 
 		if (g_memory_total_size != 0 || g_memory_total_count != 0)
 		{
-			printf("Test %s failed: memory leaks found (%u bytes in %u allocations)\n", test->_name, (unsigned int)g_memory_total_size, (unsigned int)g_memory_total_count);
+			printf("Test %s failed: memory leaks found (%u bytes in %u allocations)\n", test->_name, static_cast<unsigned int>(g_memory_total_size), static_cast<unsigned int>(g_memory_total_count));
 			return false;
 		}
 
@@ -111,7 +124,7 @@ static bool run_test(test_runner* test)
 }
 
 #if defined(__CELLOS_LV2__) && defined(PUGIXML_NO_EXCEPTIONS) && !defined(__SNC__)
-#include <stdlib.h>
+#include <exception>
 
 void std::exception::_Raise() const
 {
@@ -119,7 +132,11 @@ void std::exception::_Raise() const
 }
 #endif
 
+#ifdef _WIN32_WCE
+int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
+#else
 int main()
+#endif
 {
 #ifdef __BORLANDC__
 	_control87(MCW_EM | PC_53, MCW_EM | MCW_PC);

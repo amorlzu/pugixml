@@ -97,6 +97,14 @@ TEST_XML(write_escape_unicode, "<node attr='&#x3c00;'/>")
 #endif
 }
 
+TEST_XML(write_no_escapes, "<node attr=''>text</node>")
+{
+	doc.child(STR("node")).attribute(STR("attr")) = STR("<>'\"&\x04\r\n\t");
+	doc.child(STR("node")).first_child().set_value(STR("<>'\"&\x04\r\n\t"));
+
+	CHECK_NODE_EX(doc, STR("<node attr=\"<>'\"&\x04\r\n\t\"><>'\"&\x04\r\n\t</node>"), STR(""), format_raw | format_no_escapes);
+}
+
 struct test_writer: xml_writer
 {
 	std::basic_string<pugi::char_t> contents;
@@ -171,7 +179,7 @@ TEST(write_encodings)
 	CHECK(write_narrow(doc, format_default, encoding_utf16) == write_narrow(doc, format_default, is_little_endian() ? encoding_utf16_le : encoding_utf16_be));
 
 	size_t wcharsize = sizeof(wchar_t);
-	std::wstring v = write_wide(doc, format_default, encoding_wchar);
+	std::basic_string<wchar_t> v = write_wide(doc, format_default, encoding_wchar);
 
 	if (wcharsize == 4)
 	{
@@ -179,8 +187,10 @@ TEST(write_encodings)
 	}
 	else
 	{
-		CHECK(v.size() == 10 && v[0] == '<' && v[1] == 0x54 && v[2] == 0xA2 && v[3] == 0x20AC && v[4] == 0xd852 && v[5] == 0xdf62 && v[6] == ' ' && v[7] == '/' && v[8] == '>' && v[9] == '\n');
+		CHECK(v.size() == 10 && v[0] == '<' && v[1] == 0x54 && v[2] == 0xA2 && v[3] == 0x20AC && v[4] == wchar_cast(0xd852) && v[5] == wchar_cast(0xdf62) && v[6] == ' ' && v[7] == '/' && v[8] == '>' && v[9] == '\n');
 	}
+
+    CHECK(test_write_narrow(doc, format_default, encoding_latin1, "<\x54\xA2?? />\n", 9));
 }
 
 #ifdef PUGIXML_WCHAR_MODE

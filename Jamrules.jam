@@ -1,20 +1,59 @@
 # Rules for Jamfile.jam
 
-if ( $(toolset:I=^mingw) || $(toolset:I=^gcc) )
+if ( $(toolset:I=^mingw) || $(toolset:I=^gcc) || $(toolset:I=^bada) || $(toolset:I=^android) || $(toolset:I=^blackberry) )
 {
 	if ( $(toolset:I=^gcc) )
 	{
 		GCCPATH = "" ;
 	}
+    else if ( $(toolset:I=^android) )
+    {
+		GCCPATH = "%$(toolset)_PATH%\\toolchains\\arm-linux-androideabi-4.4.3\\prebuilt\\windows\\bin\\arm-linux-androideabi-" ;
+    }
+    else if ( $(toolset:I=^bada) )
+    {
+		GCCPATH = "%$(toolset)_PATH%\\Tools\\Toolchains\\ARM\\bin\\arm-bada-eabi-" ;
+    }
+    else if ( $(toolset:I=^blackberry) )
+    {
+		GCCPATH = "%$(toolset)_PATH%\\host\\win32\\x86\\usr\\bin\\ntoarmv7-" ;
+    }
 	else
 	{
 		GCCPATH = "%$(toolset)_PATH%\\bin\\" ;
-	}
+    }
 
 	if ( $(OS) != MACOSX )
 	{
-		LDFLAGS += -static-libgcc -static ;
 		ARCH = "" ;
+
+        if ( $(toolset:I=^bada) )
+        {
+            LDFLAGS += -lstdc++ -lsupc++-xnew -lc ;
+        }
+        else if ( $(toolset:I=^android) )
+        {
+            LDFLAGS += -nostdlib ;
+            LDFLAGS += -L"%$(toolset)_PATH%\\platforms\\android-5\\arch-arm\\usr\\lib" ;
+
+            if ( $(toolset:I=stlport) )
+            {
+                LDFLAGS += -L"%$(toolset)_PATH%\\sources\\cxx-stl\\stlport\\libs\\armeabi-v7a" ;
+                LDFLAGS += -lstlport_static ;
+            }
+            else
+            {
+                LDFLAGS += -L"%$(toolset)_PATH%\\sources\\cxx-stl\\gnu-libstdc++\\libs\\armeabi-v7a" ;
+                LDFLAGS += -lgnustl_static -lsupc++ ;
+            }
+
+            LDFLAGS += "%$(toolset)_PATH%\\platforms\\android-5\\arch-arm\\usr\\lib\\crtbegin_dynamic.o" ;
+            LDFLAGS += -lstdc++ -lc -lm -lgcc ;
+        }
+        else if ( $(OS) = NT || $(OS) = FREEBSD )
+        {
+            LDFLAGS += -static-libgcc -static ;
+        }
 	}
 	else
 	{
@@ -30,11 +69,30 @@ if ( $(toolset:I=^mingw) || $(toolset:I=^gcc) )
 		LDFLAGS += $(ARCH) ;
 	}
 
+    GCCVERSION = [ Shell "$(GCCPATH)gcc -dumpversion" ] ;
+
 	rule GetCFlags CONFIG : DEFINES
 	{
 		local RESULT = -D$(DEFINES) ;
 
-		RESULT += -W -Wall -Wextra -Werror -pedantic ;
+		RESULT += -W -Wall -Wextra -pedantic -Werror ;
+        RESULT += -Wabi -Wno-non-template-friend -Wcast-qual -Wcast-align ;
+        RESULT += -Woverloaded-virtual -Wno-pmf-conversions -Wsign-promo -Wformat=2 -Winit-self ;
+        RESULT += -Wunused -Wstrict-aliasing=2 -Wundef -Wshadow -Wredundant-decls ;
+
+        # gcc 4.0 has some warning regressions
+        if ( ! $(GCCVERSION:I=4\.0) )
+        {
+            RESULT += -Wold-style-cast ; # gives warnings for fpclassify() on gcc 4.0.1
+            RESULT += -Wswitch-default ; # gives false-positives for couple of switches on template argument on gcc 4.0.1
+            RESULT += -Wctor-dtor-privacy ; # gives false-positives for structs on gcc 4.0.1
+        }
+
+        # these warnings are supported on newer GCC versions only
+        if ( $(GCCVERSION) >= "4.4.0" )
+        {
+            RESULT += -Wstrict-null-sentinel -Wlogical-op -Wmissing-declarations ;
+        }
 
 		if ( $(toolset:I=_0x) )
 		{
@@ -59,6 +117,25 @@ if ( $(toolset:I=^mingw) || $(toolset:I=^gcc) )
 		{
 			RESULT += -fno-exceptions ;
 		}
+
+        if ( $(toolset:I=^android) )
+        {
+            RESULT += -DANDROID ;
+            RESULT += -mfloat-abi=softfp ;
+
+            if ( $(toolset:I=stlport) )
+            {
+                RESULT += -isystem"%$(toolset)_path%/sources/cxx-stl/stlport/stlport" ;
+                RESULT += -isystem"%$(toolset)_path%/sources/cxx-stl/system/include" ;
+            }
+            else
+            {
+                RESULT += -isystem"%$(toolset)_path%/sources/cxx-stl/gnu-libstdc++/include" ;
+                RESULT += -isystem"%$(toolset)_path%/sources/cxx-stl/gnu-libstdc++/libs/armeabi-v7a/include" ;
+            }
+
+            RESULT += -isystem"%$(toolset)_path%/platforms/android-5/arch-arm/usr/include" ;
+        }
 
 		RESULT += $(ARCH) ;
 
@@ -87,17 +164,58 @@ else if ( $(toolset:I=^msvc) )
 		LDFLAGS += /DEBUG ;
 	}
 
-	if ( $(toolset:I=x64$) )
-	{
-		postfix = "\\amd64" ;
-		sdk_postfix = "\\x64" ;
-		LDFLAGS += /MACHINE:X64 ;
-	}
-	else
-	{
-		postfix = "" ;
-		sdk_postfix = "" ;
-	}
+    if ( $(toolset:I=_wince) )
+    {
+        postfix = "\\x86_arm" ;
+        
+        LDFLAGS += /SUBSYSTEM:WINDOWSCE ;
+        LDFLAGS += coredll.lib corelibc.lib ccrtrtti.lib ;
+        LDFLAGS += "/LIBPATH:\"%$(toolset)_PATH%\\lib\\armv4\"" ;
+        LDFLAGS += "/LIBPATH:\"%WINCESDK_PATH%\\lib\\armv4\"" ;
+    }
+    else
+    {
+        local sdk_postfix ;
+
+        if ( $(toolset:I=x64$) )
+        {
+            postfix = "\\amd64" ;
+            lib_postfix = "\\amd64" ;
+            sdk_postfix = "\\x64" ;
+            kits_postfix = "\\x64" ;
+            LDFLAGS += /MACHINE:X64 ;
+        }
+        else if ( $(toolset:I=arm$) )
+        {
+            postfix = "\\x86_arm" ;
+            lib_postfix = "\\arm" ;
+            sdk_postfix = "\\arm" ;
+            kits_postfix = "\\arm" ;
+            LDFLAGS += /MACHINE:ARM ;
+        }
+        else
+        {
+            postfix = "" ;
+            lib_postfix = "" ;
+            sdk_postfix = "" ;
+            kits_postfix = "\\x86" ;
+        }
+        
+        LDFLAGS += "/LIBPATH:\"%$(toolset)_PATH%\\lib$(lib_postfix)\"" ;
+
+        if ( $(toolset:I=msvc(6|7)) )
+        {
+            LDFLAGS += "/LIBPATH:\"%$(toolset)_PATH%\\PlatformSDK\\lib$(lib_postfix)\"" ;
+        }
+        else if ( $(toolset:I=msvc(8|9|10)) )
+        {
+            LDFLAGS += "/LIBPATH:\"%WINSDK_PATH%\\lib$(sdk_postfix)\"" ;
+        }
+        else
+        {
+            LDFLAGS += "/LIBPATH:\"%WINKITS_PATH%\\lib\\win8\\um$(kits_postfix)\"" ;
+        }
+    }
 
 	rule GetCFlags CONFIG : DEFINES
 	{
@@ -108,13 +226,20 @@ else if ( $(toolset:I=^msvc) )
 			RESULT += /Z7 ;
 		}
 
+        local RUNTIME = "MT" ;
+
+        if ( $(toolset:I=_clr) )
+        {
+            RUNTIME = "MD" ;
+        }
+
 		if ( $(CONFIG) = "debug" )
 		{
-			RESULT += /D_DEBUG /MTd ;
+			RESULT += /D_DEBUG /$(RUNTIME)d ;
 		}
 		else
 		{
-			RESULT += /DNDEBUG /Ox /MT ;
+			RESULT += /DNDEBUG /Ox /$(RUNTIME) ;
 		}
 
 		if ( $(toolset) = msvc7 || $(toolset) = msvc71 || $(toolset) = msvc8 )
@@ -131,13 +256,18 @@ else if ( $(toolset:I=^msvc) )
 			RESULT += /W3 ; # lots of warnings at W4 in standard library
 		}
 
-		if ( ! ( PUGIXML_NO_EXCEPTIONS in $(DEFINES) ) )
+        if ( $(toolset:I=_clr) )
+        {
+            RESULT += /clr ;
+        }
+        else if ( ! ( PUGIXML_NO_EXCEPTIONS in $(DEFINES) ) )
 		{
 			RESULT += /EHsc ;
 		}
-		else if ( $(toolset) = "msvc6" || $(toolset) = "msvc71" )
+		else if ( $(toolset) = "msvc6" || $(toolset) = "msvc71" || $(toolset:I=_wince) )
 		{
 			# No no-exception STL in MSVC6, buggy no-exception STL in MSVC71
+            # No proper runtime library variant for no-exception in WinCE (ccrtrtti.lib contains what() & dtor)
 			RESULT += /EHsc ;
 		}
 		else
@@ -145,12 +275,37 @@ else if ( $(toolset:I=^msvc) )
 			RESULT += /D_HAS_EXCEPTIONS=0 ;
 		}
 
+        if ( $(toolset:I=_wince) )
+        {
+            RESULT += /D_WIN32_WCE /DARM ;
+            RESULT += "/I\"%$(toolset)_PATH%\\include\"" ;
+            RESULT += "/I\"%WINCESDK_PATH%\\Include\"" ;
+        }
+        else
+        {
+            RESULT += "/I\"%$(toolset)_PATH%\\include\"" ;
+
+            if ( $(toolset:I=msvc(6|7)) )
+            {
+                RESULT += "/I\"%$(toolset)_PATH%\\PlatformSDK\\include\"" ;
+            }
+            else if ( $(toolset:I=msvc(8|9|10)) )
+            {
+                RESULT += "/I\"%WINSDK_PATH%\\Include\"" ;
+            }
+            else
+            {
+                RESULT += "/I\"%WINKITS_PATH%\\include\\shared\"" ;
+                RESULT += "/I\"%WINKITS_PATH%\\include\\um\"" ;
+            }
+        }
+
 		return $(RESULT) ;
 	}
 
 	actions ObjectAction
 	{
-		"%$(toolset)_PATH%\bin$(postfix)\cl.exe" /WX /I"%$(toolset)_PATH%\include" /I"%$(toolset)_PATH%\PlatformSDK\include" /I"%WINSDK_PATH%\Include" /c $(>) /Fo$(<) /nologo $(CCFLAGS)
+		"%$(toolset)_PATH%\bin$(postfix)\cl.exe" /WX /c $(>) /Fo$(<) /nologo $(CCFLAGS)
 	}
 	
 	actions LibraryAction
@@ -160,86 +315,141 @@ else if ( $(toolset:I=^msvc) )
 	
 	actions LinkAction
 	{
-		"%$(toolset)_PATH%\bin$(postfix)\link.exe" /SUBSYSTEM:CONSOLE /NOLOGO /OUT:$(<) /PDB:$(<:S=.pdb) $(>) /LIBPATH:"%$(toolset)_PATH%\lib$(postfix)" /LIBPATH:"%$(toolset)_PATH%\PlatformSDK\lib$(postfix)" /LIBPATH:"%WINSDK_PATH%\Lib$(sdk_postfix)" $(LDFLAGS)
+		"%$(toolset)_PATH%\bin$(postfix)\link.exe" /SUBSYSTEM:CONSOLE /NOLOGO /OUT:$(<) /PDB:$(<:S=.pdb) $(>) $(LDFLAGS)
 	}
 }
 else if ( $(toolset:I=^ic) )
 {
-	if ( $(toolset) = ic8 || $(toolset) = ic9 )
-	{
-		msvc = "msvc71" ;
-	}
-	else
-	{
-		msvc = "msvc8" ;
-	}
+    if ( $(OS) = NT )
+    {
+        if ( $(toolset) = ic8 || $(toolset) = ic9 )
+        {
+            msvc = "msvc71" ;
+        }
+        else
+        {
+            msvc = "msvc8" ;
+        }
 
-	if ( $(toolset) = ic11 )
-	{
-		postfix = "\\ia32" ;
-	}
-	else if ( $(toolset) = ic11_x64 )
-	{
-		postfix = "\\intel64" ;
-	}
-	else
-	{
-		postfix = "" ;
-	}
+        if ( $(toolset) = ic11 )
+        {
+            postfix = "\\ia32" ;
+        }
+        else if ( $(toolset) = ic11_x64 )
+        {
+            postfix = "\\intel64" ;
+        }
+        else
+        {
+            postfix = "" ;
+        }
 
-	if ( $(toolset:I=_x64$) )
-	{
-		msvc_postfix = "\\amd64" ;
-		LDFLAGS += /MACHINE:X64 ;
-	}
-	else
-	{
-		msvc_postfix = "" ;
-	}
+        if ( $(toolset:I=_x64$) )
+        {
+            msvc_postfix = "\\amd64" ;
+            LDFLAGS += /MACHINE:X64 ;
+        }
+        else
+        {
+            msvc_postfix = "" ;
+        }
 
-	rule GetCFlags CONFIG : DEFINES
-	{
-		local RESULT = /D$(DEFINES) ;
+        rule GetCFlags CONFIG : DEFINES
+        {
+            local RESULT = /D$(DEFINES) ;
 
-		RESULT += /W3 /WX /Qvec_report0 ;
+            RESULT += /W3 /WX /Qvec_report0 ;
 
-		if ( $(toolset) != ic8 )
-		{
-			RESULT += /fp:precise ;
-		}
+            if ( $(toolset) != ic8 )
+            {
+                RESULT += /fp:precise ;
+            }
 
-		if ( $(CONFIG) = "debug" )
-		{
-			RESULT += /D_DEBUG /Od /MTd ;
-		}
-		else
-		{
-			RESULT += /DNDEBUG /Ox /MT ;
-		}
+            if ( $(CONFIG) = "debug" )
+            {
+                RESULT += /D_DEBUG /Od /MTd ;
+            }
+            else
+            {
+                RESULT += /DNDEBUG /Ox /MT ;
+            }
 
-		if ( ! ( PUGIXML_NO_EXCEPTIONS in $(DEFINES) ) )
-		{
-			RESULT += /EHsc ;
-		}
+            if ( ! ( PUGIXML_NO_EXCEPTIONS in $(DEFINES) ) )
+            {
+                RESULT += /EHsc ;
+            }
 
-		return $(RESULT) ;
-	}
+            return $(RESULT) ;
+        }
 
-	actions ObjectAction
-	{
-		set PATH=%$(msvc)_PATH%\bin
-		"%$(toolset)_PATH%\bin$(postfix)\icl.exe" /I"%$(msvc)_PATH%\include" /I"%$(msvc)_PATH%\PlatformSDK\Include" /I"%$(toolset)_PATH%\include" /c $(>) /Fo$(<) /nologo $(CCFLAGS)
-	}
-	
-	actions LibraryAction
-	{
-		"%$(msvc)_PATH%\bin\lib.exe" /NOLOGO /OUT:$(<) $(>)
-	}
-	
-	actions LinkAction
-	{
-		"%$(msvc)_PATH%\bin\link.exe" /SUBSYSTEM:CONSOLE /NOLOGO /OUT:$(<) $(>) /LIBPATH:"%$(toolset)_PATH%\lib$(postfix)" /LIBPATH:"%$(msvc)_PATH%\lib$(msvc_postfix)" /LIBPATH:"%$(msvc)_PATH%\PlatformSDK\lib$(msvc_postfix)" $(LDFLAGS)
-	}
+        actions ObjectAction
+        {
+            set PATH=%$(msvc)_PATH%\bin
+            "%$(toolset)_PATH%\bin$(postfix)\icl.exe" /I"%$(msvc)_PATH%\include" /I"%$(msvc)_PATH%\PlatformSDK\Include" /I"%$(toolset)_PATH%\include" /c $(>) /Fo$(<) /nologo $(CCFLAGS)
+        }
+        
+        actions LibraryAction
+        {
+            "%$(msvc)_PATH%\bin\lib.exe" /NOLOGO /OUT:$(<) $(>)
+        }
+        
+        actions LinkAction
+        {
+            "%$(msvc)_PATH%\bin\link.exe" /SUBSYSTEM:CONSOLE /NOLOGO /OUT:$(<) $(>) /LIBPATH:"%$(toolset)_PATH%\lib$(postfix)" /LIBPATH:"%$(msvc)_PATH%\lib$(msvc_postfix)" /LIBPATH:"%$(msvc)_PATH%\PlatformSDK\lib$(msvc_postfix)" $(LDFLAGS)
+        }
+    }
+    else
+    {
+        rule GetCFlags CONFIG : DEFINES
+        {
+            local RESULT = -D$(DEFINES) ;
+
+            RESULT += -fp-model strict ;
+
+            RESULT += -Wall -Werror -Wcheck ;
+            RESULT += -Wformat -Wformat-security -Wmissing-declarations -Wmissing-prototypes -Wstrict-aliasing ;
+            RESULT += -Wstrict-prototypes -Wpointer-arith -Wuninitialized -Wdeprecated -Wabi ;
+            RESULT += -Wcast-qual -Wunused-function -Wunknown-pragmas -Wmain -Wcomment -Wconversion ;
+            RESULT += -Wreturn-type -Wextra-tokens -Wpragma-once -Wshadow -Woverloaded-virtual -Wtrigraphs ;
+            RESULT += -Wmultichar -Woverflow -Wwrite-strings -Wsign-compare -Wp64 -Wshorten-64-to-32 ;
+
+            if ( $(fulldebug) )
+            {
+                RESULT += -g ;
+            }
+
+            if ( $(CONFIG) = "debug" )
+            {
+                RESULT += -D_DEBUG ;
+            }
+            else
+            {
+                RESULT += -DNDEBUG -O3 ;
+            }
+
+            if ( PUGIXML_NO_EXCEPTIONS in $(DEFINES) )
+            {
+                RESULT += -fno-exceptions ;
+            }
+
+            return $(RESULT) ;
+        }
+
+        actions ObjectAction
+        {
+            icc -c $(>) -o $(<) $(CCFLAGS)
+        }
+        
+        actions LibraryAction
+        {
+            ar rcs $(<) $(>)
+        }
+        
+        actions LinkAction
+        {
+            icc $(>) -o $(<) $(LDFLAGS)
+        }
+    }
 }
 else if ( $(toolset:I=^dmc) )
 {
@@ -540,7 +750,8 @@ else
 	exit "Unknown toolset $(toolset)!" ;
 }
 
-COVSUCCESS = "echo $" "(COVPREFIX) success" ;
+RUNRESULT = "success" ;
+COVSUCCESS = "echo $" "(COVPREFIX) $" "(RUNRESULT)" ;
 
 if ( $(toolset:I=^mingw) || $(toolset:I=^gcc) )
 {
@@ -583,8 +794,10 @@ if ( $(UNIX) )
 }
 else
 {
-	if ( $(toolset:I=^(xbox360|ps3)) )
+	if ( $(toolset:I=(^xbox360|^ps3|wince$|arm$|^android|^bada|^blackberry)) )
 	{
+        RUNRESULT = "skiprun" ;
+
 		actions RunAction
 		{
 		}

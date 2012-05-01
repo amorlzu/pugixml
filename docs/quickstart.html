@@ -1,16 +1,16 @@
 <html>
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=US-ASCII">
-<title>pugixml 1.0</title>
+<title>pugixml 1.2</title>
 <link rel="stylesheet" href="pugixml.css" type="text/css">
 <meta name="generator" content="DocBook XSL Stylesheets V1.75.2">
-<link rel="home" href="quickstart.html" title="pugixml 1.0">
+<link rel="home" href="quickstart.html" title="pugixml 1.2">
 </head>
 <body bgcolor="white" text="black" link="#0000FF" vlink="#840084" alink="#0000FF">
 <div class="article">
 <div class="section">
 <div class="titlepage"><div><div><h2 class="title" style="clear: both">
-<a name="quickstart.main"></a><a class="link" href="quickstart.html#quickstart.main" title="pugixml 1.0 quick start guide"> pugixml 1.0 quick start guide</a>
+<a name="quickstart.main"></a><a class="link" href="quickstart.html#quickstart.main" title="pugixml 1.2 quick start guide"> pugixml 1.2 quick start guide</a>
 </h2></div></div></div>
 <div class="toc"><dl>
 <dt><span class="section"><a href="quickstart.html#quickstart.main.introduction"> Introduction</a></span></dt>
@@ -75,8 +75,8 @@
         pugixml is distributed in source form. You can download a source distribution
         via one of the following links:
       </p>
-<pre class="programlisting"><a href="http://pugixml.googlecode.com/files/pugixml-1.0.zip" target="_top">http://pugixml.googlecode.com/files/pugixml-1.0.zip</a>
-<a href="http://pugixml.googlecode.com/files/pugixml-1.0.tar.gz" target="_top">http://pugixml.googlecode.com/files/pugixml-1.0.tar.gz</a>
+<pre class="programlisting"><a href="http://pugixml.googlecode.com/files/pugixml-1.2.zip" target="_top">http://pugixml.googlecode.com/files/pugixml-1.2.zip</a>
+<a href="http://pugixml.googlecode.com/files/pugixml-1.2.tar.gz" target="_top">http://pugixml.googlecode.com/files/pugixml-1.2.tar.gz</a>
 </pre>
 <p>
         The distribution contains library source, documentation (the guide you're
@@ -151,9 +151,9 @@
 <li class="listitem">
             Plain character data nodes (<code class="computeroutput"><span class="identifier">node_pcdata</span></code>)
             represent plain text in XML. PCDATA nodes have a value, but do not have
-            name or children/attributes. Note that plain character data is not a
-            part of the element node but instead has its own node; for example, an
-            element node can have several child PCDATA nodes.
+            name or children/attributes. Note that <span class="bold"><strong>plain character
+            data is not a part of the element node but instead has its own node</strong></span>;
+            for example, an element node can have several child PCDATA nodes.
           </li>
 </ul></div>
 <p>
@@ -385,7 +385,7 @@
             In this case, <code class="computeroutput"><span class="special">&lt;</span><span class="identifier">description</span><span class="special">&gt;</span></code> node does not have a value, but instead
             has a child of type <code class="computeroutput"><span class="identifier">node_pcdata</span></code>
             with value <code class="computeroutput"><span class="string">"This is a node"</span></code>.
-            pugixml provides <code class="computeroutput"><span class="identifier">child_value</span><span class="special">()</span></code> helper functions to parse such data.
+            pugixml provides <code class="computeroutput"><span class="identifier">child_value</span><span class="special">()</span></code> and <code class="computeroutput"><span class="identifier">text</span><span class="special">()</span></code> helper functions to parse such data.
           </li>
 <li class="listitem">
             In many cases attribute values have types that are not strings - i.e.
@@ -454,6 +454,40 @@
     <span class="keyword">for</span> <span class="special">(</span><span class="identifier">pugi</span><span class="special">::</span><span class="identifier">xml_attribute_iterator</span> <span class="identifier">ait</span> <span class="special">=</span> <span class="identifier">it</span><span class="special">-&gt;</span><span class="identifier">attributes_begin</span><span class="special">();</span> <span class="identifier">ait</span> <span class="special">!=</span> <span class="identifier">it</span><span class="special">-&gt;</span><span class="identifier">attributes_end</span><span class="special">();</span> <span class="special">++</span><span class="identifier">ait</span><span class="special">)</span>
     <span class="special">{</span>
         <span class="identifier">std</span><span class="special">::</span><span class="identifier">cout</span> <span class="special">&lt;&lt;</span> <span class="string">" "</span> <span class="special">&lt;&lt;</span> <span class="identifier">ait</span><span class="special">-&gt;</span><span class="identifier">name</span><span class="special">()</span> <span class="special">&lt;&lt;</span> <span class="string">"="</span> <span class="special">&lt;&lt;</span> <span class="identifier">ait</span><span class="special">-&gt;</span><span class="identifier">value</span><span class="special">();</span>
+    <span class="special">}</span>
+
+    <span class="identifier">std</span><span class="special">::</span><span class="identifier">cout</span> <span class="special">&lt;&lt;</span> <span class="identifier">std</span><span class="special">::</span><span class="identifier">endl</span><span class="special">;</span>
+<span class="special">}</span>
+</pre>
+<p>
+      </p>
+<p>
+        If your C++ compiler supports range-based for-loop (this is a C++11 feature,
+        at the time of writing it's supported by Microsoft Visual Studio 11 Beta,
+        GCC 4.6 and Clang 3.0), you can use it to enumerate nodes/attributes. Additional
+        helpers are provided to support this; note that they are also compatible
+        with <a href="http://www.boost.org/libs/foreach/" target="_top">Boost Foreach</a>,
+        and possibly other pre-C++11 foreach facilities.
+      </p>
+<p>
+        Here is an example of using C++11 range-based for loop for document traversal
+        (<a href="samples/traverse_rangefor.cpp" target="_top">samples/traverse_rangefor.cpp</a>):
+      </p>
+<p>
+        
+</p>
+<pre class="programlisting"><span class="keyword">for</span> <span class="special">(</span><span class="identifier">pugi</span><span class="special">::</span><span class="identifier">xml_node</span> <span class="identifier">tool</span><span class="special">:</span> <span class="identifier">tools</span><span class="special">.</span><span class="identifier">children</span><span class="special">(</span><span class="string">"Tool"</span><span class="special">))</span>
+<span class="special">{</span>
+    <span class="identifier">std</span><span class="special">::</span><span class="identifier">cout</span> <span class="special">&lt;&lt;</span> <span class="string">"Tool:"</span><span class="special">;</span>
+
+    <span class="keyword">for</span> <span class="special">(</span><span class="identifier">pugi</span><span class="special">::</span><span class="identifier">xml_attribute</span> <span class="identifier">attr</span><span class="special">:</span> <span class="identifier">tool</span><span class="special">.</span><span class="identifier">attributes</span><span class="special">())</span>
+    <span class="special">{</span>
+        <span class="identifier">std</span><span class="special">::</span><span class="identifier">cout</span> <span class="special">&lt;&lt;</span> <span class="string">" "</span> <span class="special">&lt;&lt;</span> <span class="identifier">attr</span><span class="special">.</span><span class="identifier">name</span><span class="special">()</span> <span class="special">&lt;&lt;</span> <span class="string">"="</span> <span class="special">&lt;&lt;</span> <span class="identifier">attr</span><span class="special">.</span><span class="identifier">value</span><span class="special">();</span>
+    <span class="special">}</span>
+
+    <span class="keyword">for</span> <span class="special">(</span><span class="identifier">pugi</span><span class="special">::</span><span class="identifier">xml_node</span> <span class="identifier">child</span><span class="special">:</span> <span class="identifier">tool</span><span class="special">.</span><span class="identifier">children</span><span class="special">())</span>
+    <span class="special">{</span>
+        <span class="identifier">std</span><span class="special">::</span><span class="identifier">cout</span> <span class="special">&lt;&lt;</span> <span class="string">", child "</span> <span class="special">&lt;&lt;</span> <span class="identifier">child</span><span class="special">.</span><span class="identifier">name</span><span class="special">();</span>
     <span class="special">}</span>
 
     <span class="identifier">std</span><span class="special">::</span><span class="identifier">cout</span> <span class="special">&lt;&lt;</span> <span class="identifier">std</span><span class="special">::</span><span class="identifier">endl</span><span class="special">;</span>
@@ -796,7 +830,7 @@
       </p>
 <div class="blockquote"><blockquote class="blockquote">
 <p>
-          Copyright (c) 2006-2010 Arseny Kapoulkine
+          Copyright (c) 2006-2012 Arseny Kapoulkine
         </p>
 <p>
           Permission is hereby granted, free of charge, to any person obtaining a
@@ -828,7 +862,7 @@
 <div class="blockquote"><blockquote class="blockquote"><p>
           This software is based on pugixml library (http://pugixml.org).<br>
 pugixml
-          is Copyright (C) 2006-2010 Arseny Kapoulkine.
+          is Copyright (C) 2006-2012 Arseny Kapoulkine.
         </p></blockquote></div>
 </div>
 </div>
@@ -838,7 +872,7 @@ pugixml
 </div>
 </div>
 <table xmlns:rev="http://www.cs.rpi.edu/~gregod/boost/tools/doc/revision" width="100%"><tr>
-<td align="left"><p><small>Last revised: October 31, 2010 at 07:44:52 GMT</small></p></td>
+<td align="left"><p><small>Last revised: April 30, 2012 at 03:25:55 GMT</small></p></td>
 <td align="right"><div class="copyright-footer"></div></td>
 </tr></table>
 </body>
