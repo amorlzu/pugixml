@@ -196,7 +196,7 @@ PUGI__NS_BEGIN
 		return lhs[count] == 0;
 	}
 	
-#ifdef PUGIXML_WCHAR_MODE
+#if defined(PUGIXML_WCHAR_MODE) && !defined(PUGIXML_IMMUTABLE)
 	// Convert string to wide string, assuming all symbols are ASCII
 	PUGI__FN void widen_ascii(wchar_t* dest, const char* source)
 	{
@@ -1509,66 +1509,6 @@ PUGI__NS_BEGIN
 	}
 #endif
 
-	inline bool strcpy_insitu_allow(size_t length, uintptr_t allocated, char_t* target)
-	{
-		assert(target);
-		size_t target_length = strlength(target);
-
-		// always reuse document buffer memory if possible
-		if (!allocated) return target_length >= length;
-
-		// reuse heap memory if waste is not too great
-		const size_t reuse_threshold = 32;
-
-		return target_length >= length && (target_length < reuse_threshold || target_length - length < target_length / 2);
-	}
-
-	PUGI__FN bool strcpy_insitu(char_t*& dest, uintptr_t& header, uintptr_t header_mask, const char_t* source)
-	{
-		size_t source_length = strlength(source);
-
-		if (source_length == 0)
-		{
-			// empty string and null pointer are equivalent, so just deallocate old memory
-			xml_allocator* alloc = reinterpret_cast<xml_memory_page*>(header & xml_memory_page_pointer_mask)->allocator;
-
-			if (header & header_mask) alloc->deallocate_string(dest);
-			
-			// mark the string as not allocated
-			dest = 0;
-			header &= ~header_mask;
-
-			return true;
-		}
-		else if (dest && strcpy_insitu_allow(source_length, header & header_mask, dest))
-		{
-			// we can reuse old buffer, so just copy the new data (including zero terminator)
-			memcpy(dest, source, (source_length + 1) * sizeof(char_t));
-			
-			return true;
-		}
-		else
-		{
-			xml_allocator* alloc = reinterpret_cast<xml_memory_page*>(header & xml_memory_page_pointer_mask)->allocator;
-
-			// allocate new buffer
-			char_t* buf = alloc->allocate_string(source_length + 1);
-			if (!buf) return false;
-
-			// copy the string (including zero terminator)
-			memcpy(buf, source, (source_length + 1) * sizeof(char_t));
-
-			// deallocate old buffer (*after* the above to protect against overlapping memory and/or allocation failures)
-			if (header & header_mask) alloc->deallocate_string(dest);
-			
-			// the string is now allocated, so set the flag
-			dest = buf;
-			header |= header_mask;
-
-			return true;
-		}
-	}
-
 	struct gap
 	{
 		char_t* end;
@@ -2050,19 +1990,22 @@ PUGI__NS_BEGIN
 	struct xml_parser
 	{
 		xml_allocator alloc;
+
 		char_t* error_offset;
 		xml_parse_status error_status;
 		
 		// Parser utilities.
 		#define PUGI__SKIPWS()			{ while (PUGI__IS_CHARTYPE(*s, ct_space)) ++s; }
 		#define PUGI__OPTSET(OPT)			( optmsk & (OPT) )
-		#define PUGI__PUSHNODE(TYPE)		{ cursor = append_node(cursor, alloc, TYPE); if (!cursor) PUGI__THROW_ERROR(status_out_of_memory, s); }
-		#define PUGI__POPNODE()			{ cursor = cursor->parent; }
 		#define PUGI__SCANFOR(X)			{ while (*s != 0 && !(X)) ++s; }
 		#define PUGI__SCANWHILE(X)		{ while ((X)) ++s; }
 		#define PUGI__ENDSEG()			{ ch = *s; *s = 0; ++s; }
 		#define PUGI__THROW_ERROR(err, m)	return error_offset = m, error_status = err, static_cast<char_t*>(0)
 		#define PUGI__CHECK_ERROR(err, m)	{ if (*s == 0) PUGI__THROW_ERROR(err, m); }
+
+        // Parser tree construction
+		#define PUGI__PUSHNODE(TYPE)		{ cursor = append_node(cursor, alloc, TYPE); if (!cursor) PUGI__THROW_ERROR(status_out_of_memory, s); }
+		#define PUGI__POPNODE()			{ cursor = cursor->parent; }
 		
 		xml_parser(const xml_allocator& alloc_): alloc(alloc_), error_offset(0), error_status(status_ok)
 		{
@@ -3216,6 +3159,7 @@ PUGI__NS_BEGIN
 		return false;
 	}
 
+#ifndef PUGIXML_IMMUTABLE
 	inline bool allow_insert_child(xml_node_type parent, xml_node_type child)
 	{
 		if (parent != node_document && parent != node_element) return false;
@@ -3277,6 +3221,7 @@ PUGI__NS_BEGIN
 			assert(!"Invalid node type");
 		}
 	}
+#endif
 
 	inline bool is_text_node(xml_node_struct* node)
 	{
@@ -3341,6 +3286,67 @@ PUGI__NS_BEGIN
 		return (first == '1' || first == 't' || first == 'T' || first == 'y' || first == 'Y');
 	}
 
+#ifndef PUGIXML_IMMUTABLE
+	inline bool strcpy_insitu_allow(size_t length, uintptr_t allocated, char_t* target)
+	{
+		assert(target);
+		size_t target_length = strlength(target);
+
+		// always reuse document buffer memory if possible
+		if (!allocated) return target_length >= length;
+
+		// reuse heap memory if waste is not too great
+		const size_t reuse_threshold = 32;
+
+		return target_length >= length && (target_length < reuse_threshold || target_length - length < target_length / 2);
+	}
+
+	PUGI__FN bool strcpy_insitu(char_t*& dest, uintptr_t& header, uintptr_t header_mask, const char_t* source)
+	{
+		size_t source_length = strlength(source);
+
+		if (source_length == 0)
+		{
+			// empty string and null pointer are equivalent, so just deallocate old memory
+			xml_allocator* alloc = reinterpret_cast<xml_memory_page*>(header & xml_memory_page_pointer_mask)->allocator;
+
+			if (header & header_mask) alloc->deallocate_string(dest);
+			
+			// mark the string as not allocated
+			dest = 0;
+			header &= ~header_mask;
+
+			return true;
+		}
+		else if (dest && strcpy_insitu_allow(source_length, header & header_mask, dest))
+		{
+			// we can reuse old buffer, so just copy the new data (including zero terminator)
+			memcpy(dest, source, (source_length + 1) * sizeof(char_t));
+			
+			return true;
+		}
+		else
+		{
+			xml_allocator* alloc = reinterpret_cast<xml_memory_page*>(header & xml_memory_page_pointer_mask)->allocator;
+
+			// allocate new buffer
+			char_t* buf = alloc->allocate_string(source_length + 1);
+			if (!buf) return false;
+
+			// copy the string (including zero terminator)
+			memcpy(buf, source, (source_length + 1) * sizeof(char_t));
+
+			// deallocate old buffer (*after* the above to protect against overlapping memory and/or allocation failures)
+			if (header & header_mask) alloc->deallocate_string(dest);
+			
+			// the string is now allocated, so set the flag
+			dest = buf;
+			header |= header_mask;
+
+			return true;
+		}
+	}
+
 	// set value with conversion functions
 	PUGI__FN bool set_value_buffer(char_t*& dest, uintptr_t& header, uintptr_t header_mask, char (&buf)[128])
 	{
@@ -3382,6 +3388,7 @@ PUGI__NS_BEGIN
 	{
 		return strcpy_insitu(dest, header, header_mask, value ? PUGIXML_TEXT("true") : PUGIXML_TEXT("false"));
 	}
+#endif
 
 	// we need to get length of entire file to load it in memory; the only (relatively) sane way to do it is via seek/tell trick
 	PUGI__FN xml_parse_status get_file_size(FILE* file, size_t& out_result)
@@ -3860,6 +3867,7 @@ namespace pugi
 		return _attr;
 	}
 
+#ifndef PUGIXML_IMMUTABLE
 	PUGI__FN xml_attribute& xml_attribute::operator=(const char_t* rhs)
 	{
 		set_value(rhs);
@@ -3931,6 +3939,7 @@ namespace pugi
 
 		return impl::set_value_convert(_attr->value, _attr->header, impl::xml_memory_page_value_allocated_mask, rhs);
 	}
+#endif
 
 #ifdef __BORLANDC__
 	PUGI__FN bool operator&&(const xml_attribute& lhs, bool rhs)
@@ -4163,6 +4172,7 @@ namespace pugi
 		return _root && _root->first_child ? xml_node(_root->first_child->prev_sibling_c) : xml_node();
 	}
 
+#ifndef PUGIXML_IMMUTABLE
 	PUGI__FN bool xml_node::set_name(const char_t* rhs)
 	{
 		switch (type())
@@ -4528,6 +4538,7 @@ namespace pugi
 
 		return true;
 	}
+#endif
 
 	PUGI__FN xml_node xml_node::find_child_by_attribute(const char_t* name_, const char_t* attr_name, const char_t* attr_value) const
 	{
@@ -4765,14 +4776,6 @@ namespace pugi
 		return 0;
 	}
 
-	PUGI__FN xml_node_struct* xml_text::_data_new()
-	{
-		xml_node_struct* d = _data();
-		if (d) return d;
-
-		return xml_node(_root).append_child(node_pcdata).internal_object();
-	}
-
 	PUGI__FN xml_text::xml_text(): _root(0)
 	{
 	}
@@ -4845,6 +4848,15 @@ namespace pugi
 		return impl::get_value_bool(d ? d->value : 0, def);
 	}
 
+#ifndef PUGIXML_IMMUTABLE
+	PUGI__FN xml_node_struct* xml_text::_data_new()
+	{
+		xml_node_struct* d = _data();
+		if (d) return d;
+
+		return xml_node(_root).append_child(node_pcdata).internal_object();
+	}
+
 	PUGI__FN bool xml_text::set(const char_t* rhs)
 	{
 		xml_node_struct* dn = _data_new();
@@ -4909,6 +4921,7 @@ namespace pugi
 		set(rhs);
 		return *this;
 	}
+#endif
 
 	PUGI__FN xml_node xml_text::data() const
 	{
@@ -5149,8 +5162,12 @@ namespace pugi
 	{
 		reset();
 
+    #ifdef PUGIXML_IMMUTABLE
+		assert(false);
+	#else
 		for (xml_node cur = proto.first_child(); cur; cur = cur.next_sibling())
 			append_copy(cur);
+    #endif
 	}
 
 	PUGI__FN void xml_document::create()

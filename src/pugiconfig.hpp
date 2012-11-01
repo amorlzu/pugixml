@@ -26,6 +26,9 @@
 // Uncomment this to disable exceptions
 // #define PUGIXML_NO_EXCEPTIONS
 
+// Uncomment this to switch to more efficient but immutable tree implementation
+// #define PUGIXML_IMMUTABLE
+
 // Set this to control attributes for public classes/functions, i.e.:
 // #define PUGIXML_API __declspec(dllexport) // to export all public symbols from DLL
 // #define PUGIXML_CLASS __declspec(dllimport) // to import all classes from DLL

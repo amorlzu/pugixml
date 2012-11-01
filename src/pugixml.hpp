@@ -190,11 +190,23 @@ namespace pugi
 	// The default set of formatting flags.
 	// Nodes are indented depending on their depth in DOM tree, a default declaration is output if document has none.
 	const unsigned int format_default = format_indent;
+
+    // Attribute/node state
+#ifdef PUGIXML_IMMUTABLE
+	struct xml_attribute_struct;
+    typedef xml_attribute_struct* xml_attribute_state;
+
+	struct xml_node_struct;
+    typedef xml_node_struct* xml_node_state;
+#else
+	struct xml_attribute_struct;
+    typedef xml_attribute_struct* xml_attribute_state;
+
+	struct xml_node_struct;
+    typedef xml_node_struct* xml_node_state;
+#endif
 		
 	// Forward declarations
-	struct xml_attribute_struct;
-	struct xml_node_struct;
-
 	class xml_node_iterator;
 	class xml_attribute_iterator;
 	class xml_named_node_iterator;
@@ -277,7 +289,7 @@ namespace pugi
 		friend class xml_node;
 
 	private:
-		xml_attribute_struct* _attr;
+		xml_attribute_state _attr;
 	
 		typedef void (*unspecified_bool_type)(xml_attribute***);
 
@@ -286,7 +298,7 @@ namespace pugi
 		xml_attribute();
 		
 		// Constructs attribute from internal pointer
-		explicit xml_attribute(xml_attribute_struct* attr);
+		explicit xml_attribute(xml_attribute_state attr);
 
 		// Safe bool conversion operator
 		operator unspecified_bool_type() const;
@@ -321,6 +333,7 @@ namespace pugi
 		// Get attribute value as bool (returns true if first character is in '1tTyY' set), or the default value if attribute is empty
 		bool as_bool(bool def = false) const;
 
+    #ifndef PUGIXML_IMMUTABLE
 		// Set attribute name/value (returns false if attribute is empty or there is not enough memory)
 		bool set_name(const char_t* rhs);
 		bool set_value(const char_t* rhs);
@@ -337,6 +350,7 @@ namespace pugi
 		xml_attribute& operator=(unsigned int rhs);
 		xml_attribute& operator=(double rhs);
 		xml_attribute& operator=(bool rhs);
+    #endif
 
 		// Get next/previous attribute in the attribute list of the parent node
 		xml_attribute next_attribute() const;
@@ -346,7 +360,7 @@ namespace pugi
 		size_t hash_value() const;
 
 		// Get internal pointer
-		xml_attribute_struct* internal_object() const;
+		xml_attribute_state internal_object() const;
 	};
 
 #ifdef __BORLANDC__
@@ -363,7 +377,7 @@ namespace pugi
 		friend class xml_named_node_iterator;
 
 	protected:
-		xml_node_struct* _root;
+		xml_node_state _root;
 
 		typedef void (*unspecified_bool_type)(xml_node***);
 
@@ -372,7 +386,7 @@ namespace pugi
 		xml_node();
 
 		// Constructs node from internal pointer
-		explicit xml_node(xml_node_struct* p);
+		explicit xml_node(xml_node_state p);
 
 		// Safe bool conversion operator
 		operator unspecified_bool_type() const;
@@ -431,6 +445,7 @@ namespace pugi
 		// Get child value of child with specified name. Equivalent to child(name).child_value().
 		const char_t* child_value(const char_t* name) const;
 
+    #ifndef PUGIXML_IMMUTABLE
 		// Set node name/value (returns false if node is empty, there is not enough memory, or node can not have name/value)
 		bool set_name(const char_t* rhs);
 		bool set_value(const char_t* rhs);
@@ -472,6 +487,7 @@ namespace pugi
 		// Remove specified child
 		bool remove_child(const xml_node& n);
 		bool remove_child(const char_t* name);
+    #endif
 
 		// Find attribute using predicate. Returns first attribute for which predicate returned true.
 		template <typename Predicate> xml_attribute find_attribute(Predicate pred) const
@@ -579,7 +595,7 @@ namespace pugi
 		size_t hash_value() const;
 
 		// Get internal pointer
-		xml_node_struct* internal_object() const;
+		xml_node_state internal_object() const;
 	};
 
 #ifdef __BORLANDC__
@@ -593,14 +609,17 @@ namespace pugi
 	{
 		friend class xml_node;
 
-		xml_node_struct* _root;
+		xml_node_state _root;
 
 		typedef void (*unspecified_bool_type)(xml_text***);
 
-		explicit xml_text(xml_node_struct* root);
+		explicit xml_text(xml_node_state root);
 
-		xml_node_struct* _data_new();
-		xml_node_struct* _data() const;
+    #ifndef PUGIXML_IMMUTABLE
+		xml_node_state _data_new();
+    #endif
+
+		xml_node_state _data() const;
 
 	public:
 		// Default constructor. Constructs an empty object.
@@ -630,6 +649,7 @@ namespace pugi
 		// Get text as bool (returns true if first character is in '1tTyY' set), or the default value if object is empty
 		bool as_bool(bool def = false) const;
 
+    #ifndef PUGIXML_IMMUTABLE
 		// Set text (returns false if object is empty or there is not enough memory)
 		bool set(const char_t* rhs);
 
@@ -645,6 +665,7 @@ namespace pugi
 		xml_text& operator=(unsigned int rhs);
 		xml_text& operator=(double rhs);
 		xml_text& operator=(bool rhs);
+    #endif
 
 		// Get the data node (node_pcdata or node_cdata) for this object
 		xml_node data() const;
@@ -665,7 +686,7 @@ namespace pugi
 		mutable xml_node _wrap;
 		xml_node _parent;
 
-		xml_node_iterator(xml_node_struct* ref, xml_node_struct* parent);
+		xml_node_iterator(xml_node_state ref, xml_node_state parent);
 
 	public:
 		// Iterator traits
@@ -707,7 +728,7 @@ namespace pugi
 		mutable xml_attribute _wrap;
 		xml_node _parent;
 
-		xml_attribute_iterator(xml_attribute_struct* ref, xml_node_struct* parent);
+		xml_attribute_iterator(xml_attribute_state ref, xml_node_state parent);
 
 	public:
 		// Iterator traits
