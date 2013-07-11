@@ -233,6 +233,7 @@ PUGI__NS_BEGIN
 PUGI__NS_END
 #endif
 
+#ifndef PUGIXML_IMMUTABLE
 PUGI__NS_BEGIN
 	static const size_t xml_memory_page_size =
 	#ifdef PUGIXML_MEMORY_PAGE_SIZE
@@ -626,6 +627,7 @@ PUGI__NS_BEGIN
 		return a;
 	}
 PUGI__NS_END
+#endif
 
 // Helper classes for code generation
 PUGI__NS_BEGIN
@@ -1987,9 +1989,15 @@ PUGI__NS_BEGIN
 		return result;
 	}
 
+#ifdef PUGIXML_IMMUTABLE
+	typedef xml_document_state xml_parser_state;
+#else
+	typedef xml_allocator xml_parser_state;
+#endif
+
 	struct xml_parser
 	{
-		xml_allocator alloc;
+		xml_parser_state state;
 
 		char_t* error_offset;
 		xml_parse_status error_status;
@@ -2004,10 +2012,10 @@ PUGI__NS_BEGIN
 		#define PUGI__CHECK_ERROR(err, m)	{ if (*s == 0) PUGI__THROW_ERROR(err, m); }
 
         // Parser tree construction
-		#define PUGI__PUSHNODE(TYPE)		{ cursor = append_node(cursor, alloc, TYPE); if (!cursor) PUGI__THROW_ERROR(status_out_of_memory, s); }
+		#define PUGI__PUSHNODE(TYPE)		{ cursor = append_node(cursor, state, TYPE); if (!cursor) PUGI__THROW_ERROR(status_out_of_memory, s); }
 		#define PUGI__POPNODE()			{ cursor = cursor->parent; }
 		
-		xml_parser(const xml_allocator& alloc_): alloc(alloc_), error_offset(0), error_status(status_ok)
+		xml_parser(const xml_parser_state& state_): state(state_), error_offset(0), error_status(status_ok)
 		{
 		}
 
@@ -2119,6 +2127,7 @@ PUGI__NS_BEGIN
 			return s;
 		}
 
+	#ifndef PUGIXML_IMMUTABLE
 		char_t* parse_exclamation(char_t* s, xml_node_struct* cursor, unsigned int optmsk, char_t endch)
 		{
 			// parse node contents, starting with exclamation mark
@@ -2322,7 +2331,9 @@ PUGI__NS_BEGIN
 
 			return s;
 		}
+	#endif
 
+	#ifndef PUGIXML_IMMUTABLE
 		char_t* parse(char_t* s, xml_node_struct* root, unsigned int optmsk, char_t endch)
 		{
 			strconv_attribute_t strconv_attribute = get_strconv_attribute(optmsk);
@@ -2361,7 +2372,7 @@ PUGI__NS_BEGIN
 						
 								if (PUGI__IS_CHARTYPE(*s, ct_start_symbol)) // <... #...
 								{
-									xml_attribute_struct* a = append_attribute_ll(cursor, alloc); // Make space for this attribute.
+									xml_attribute_struct* a = append_attribute_ll(cursor, state); // Make space for this attribute.
 									if (!a) PUGI__THROW_ERROR(status_out_of_memory, s);
 
 									a->name = s; // Save the offset.
@@ -2485,6 +2496,7 @@ PUGI__NS_BEGIN
 							++s;
 						}
 					}
+				#ifndef PUGIXML_IMMUTABLE
 					else if (*s == '?') // '<?...'
 					{
 						s = parse_question(s, cursor, optmsk, endch);
@@ -2498,6 +2510,7 @@ PUGI__NS_BEGIN
 						s = parse_exclamation(s, cursor, optmsk, endch);
 						if (!s) return s;
 					}
+				#endif
 					else if (*s == 0 && endch == '?') PUGI__THROW_ERROR(status_bad_pi, s);
 					else PUGI__THROW_ERROR(status_unrecognized_tag, s);
 				}
@@ -2554,16 +2567,13 @@ PUGI__NS_BEGIN
 			return s;
 		}
 
-		static xml_parse_result parse(char_t* buffer, size_t length, xml_document_struct* xmldoc, xml_node_struct* root, unsigned int optmsk)
+		static xml_parse_result parse(char_t* buffer, size_t length, xml_parser_state& state, xml_node_struct* root, unsigned int optmsk)
 		{
-			// allocator object is a part of document object
-			xml_allocator& alloc = *static_cast<xml_allocator*>(xmldoc);
-
 			// early-out for empty documents
 			if (length == 0) return make_parse_result(status_ok);
 
 			// create parser on stack
-			xml_parser parser(alloc);
+			xml_parser parser(state);
 
 			// save last character and make buffer zero-terminated (speeds up parsing)
 			char_t endch = buffer[length - 1];
@@ -2576,7 +2586,7 @@ PUGI__NS_BEGIN
 			assert(result.offset >= 0 && static_cast<size_t>(result.offset) <= length);
 
 			// update allocator state
-			alloc = parser.alloc;
+			state = parser.state;
 
 			// since we removed last character, we have to handle the only possible false positive
 			if (result && endch == '<')
@@ -2587,6 +2597,7 @@ PUGI__NS_BEGIN
 
 			return result;
 		}
+	#endif
 	};
 
 	// Output facilities
@@ -3677,7 +3688,7 @@ PUGI__NS_BEGIN
 		doc->buffer = buffer;
 
 		// parse
-		xml_parse_result res = impl::xml_parser::parse(buffer, length, doc, root, options);
+		xml_parse_result res = impl::xml_parser::parse(buffer, length, *doc, root, options);
 
 		// remember encoding
 		res.encoding = buffer_encoding;
