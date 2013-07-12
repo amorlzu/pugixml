@@ -193,11 +193,19 @@ namespace pugi
 
     // Attribute/node state
 #ifdef PUGIXML_IMMUTABLE
-	struct xml_attribute_struct;
-    typedef xml_attribute_struct* xml_attribute_state;
+    struct xml_document_state;
 
-	struct xml_node_struct;
-    typedef xml_node_struct* xml_node_state;
+    struct xml_attribute_state
+    {
+        size_t offset;
+        xml_document_state* state;
+    };
+
+    struct xml_node_state
+    {
+        size_t offset;
+        xml_document_state* state;
+    };
 #else
 	struct xml_attribute_struct;
     typedef xml_attribute_struct* xml_attribute_state;
@@ -212,6 +220,8 @@ namespace pugi
 	class xml_named_node_iterator;
 
 	class xml_tree_walker;
+
+	struct xml_parse_result;
 
 	class xml_node;
 
@@ -489,11 +499,14 @@ namespace pugi
 		bool remove_child(const char_t* name);
     #endif
 
+		// Parses buffer as an XML document fragment and appends all nodes as children of the current node.
+		// Copies/converts the buffer, so it may be deleted or changed after the function returns.
+		// Note: append_buffer allocates memory that has the lifetime of the owning document; removing the appended nodes does not immediately reclaim that memory.
+		xml_parse_result append_buffer(const void* contents, size_t size, unsigned int options = parse_default, xml_encoding encoding = encoding_auto);
+
 		// Find attribute using predicate. Returns first attribute for which predicate returned true.
 		template <typename Predicate> xml_attribute find_attribute(Predicate pred) const
 		{
-			if (!_root) return xml_attribute();
-			
 			for (xml_attribute attrib = first_attribute(); attrib; attrib = attrib.next_attribute())
 				if (pred(attrib))
 					return attrib;
@@ -504,8 +517,6 @@ namespace pugi
 		// Find child node using predicate. Returns first child for which predicate returned true.
 		template <typename Predicate> xml_node find_child(Predicate pred) const
 		{
-			if (!_root) return xml_node();
-	
 			for (xml_node node = first_child(); node; node = node.next_sibling())
 				if (pred(node))
 					return node;
@@ -516,11 +527,9 @@ namespace pugi
 		// Find node from subtree using predicate. Returns first node from subtree (depth-first), for which predicate returned true.
 		template <typename Predicate> xml_node find_node(Predicate pred) const
 		{
-			if (!_root) return xml_node();
-
 			xml_node cur = first_child();
 			
-			while (cur._root && cur._root != _root)
+			while (cur && cur != *this)
 			{
 				if (pred(cur)) return cur;
 
@@ -528,9 +537,9 @@ namespace pugi
 				else if (cur.next_sibling()) cur = cur.next_sibling();
 				else
 				{
-					while (!cur.next_sibling() && cur._root != _root) cur = cur.parent();
+					while (!cur.next_sibling() && cur != *this) cur = cur.parent();
 
-					if (cur._root != _root) cur = cur.next_sibling();
+					if (cur != *this) cur = cur.next_sibling();
 				}
 			}
 
@@ -842,7 +851,9 @@ namespace pugi
 		status_bad_start_element,	// Parsing error occurred while parsing start element tag
 		status_bad_attribute,		// Parsing error occurred while parsing element attribute
 		status_bad_end_element,		// Parsing error occurred while parsing end element tag
-		status_end_element_mismatch // There was a mismatch of start-end tags (closing tag had incorrect name, some tag was not closed or there was an excessive closing tag)
+		status_end_element_mismatch,// There was a mismatch of start-end tags (closing tag had incorrect name, some tag was not closed or there was an excessive closing tag)
+
+		status_append_invalid_root	// Unable to append nodes since root type is not node_element or node_document (exclusive to xml_node::append_buffer)
 	};
 
 	// Parsing result

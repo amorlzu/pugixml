@@ -382,7 +382,7 @@ TEST_XML(xpath_out_of_memory_evaluate_union, "<node><a/><a/><a/><a/><a/><a/><a/>
 {
 	test_runner::_memory_fail_threshold = 32768 + 4096 * 2;
 
-	pugi::xpath_query q(STR("a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a|a"));
+	pugi::xpath_query q(STR("a|(a|(a|(a|(a|(a|(a|(a|(a|(a|(a|(a|(a|(a|(a|(a|(a|(a|(a|(a|a)))))))))))))))))))"));
 
 #ifdef PUGIXML_NO_EXCEPTIONS
 	CHECK(q.evaluate_node_set(doc.child(STR("node"))).empty());
@@ -418,6 +418,20 @@ TEST_XML(xpath_out_of_memory_evaluate_predicate, "<node><a/><a/><a/><a/><a/><a/>
 	{
 	}
 #endif
+}
+
+TEST(xpath_memory_concat_massive)
+{
+	pugi::xml_document doc;
+	pugi::xml_node node = doc.append_child(STR("node"));
+
+	for (int i = 0; i < 5000; ++i)
+		node.append_child(STR("c")).text().set(i % 10);
+
+	pugi::xpath_query q(STR("/"));
+	size_t size = q.evaluate_string(0, 0, node);
+
+	CHECK(size == 5001);
 }
 
 #endif
