@@ -249,7 +249,7 @@ TEST(document_load_file_empty)
 {
 	pugi::xml_document doc;
 
-	CHECK(doc.load_file("tests/data/empty.xml"));
+	CHECK(doc.load_file("tests/data/empty.xml").status == status_no_document_element);
 	CHECK(!doc.first_child());
 }
 
@@ -272,10 +272,6 @@ TEST(document_load_file_error)
 	pugi::xml_document doc;
 
 	CHECK(doc.load_file("filedoesnotexist").status == status_file_not_found);
-
-#ifdef _WIN32
-	CHECK(doc.load_file("con").status == status_io_error);
-#endif
 
 	test_runner::_memory_fail_threshold = 1;
 	CHECK(doc.load_file("tests/data/small.xml").status == status_out_of_memory);
@@ -412,35 +408,20 @@ TEST_XML(document_save_declaration_latin1, "<node/>")
 	CHECK(writer.as_narrow() == "<?xml version=\"1.0\" encoding=\"ISO-8859-1\"?>\n<node />\n");
 }
 
-#define USE_MKSTEMP defined(__unix) || defined(__QNX__) || defined(ANDROID)
-
 struct temp_file
 {
 	char path[512];
-	int fd;
 	
-	temp_file(): fd(0)
+	temp_file()
 	{
-	#if USE_MKSTEMP
-		strcpy(path, "/tmp/pugiXXXXXX");
-
-		fd = mkstemp(path);
-		CHECK(fd != -1);
-	#elif defined(__CELLOS_LV2__) || defined(_WIN32_WCE)
-		path[0] = 0; // no temporary file support
-	#else
-		tmpnam(path);
-	#endif
+		static int index = 0;
+		sprintf(path, "%stempfile%d", test_runner::_temp_path, index++);
 	}
 
 	~temp_file()
 	{
-    #ifndef _WIN32_WCE
+	#ifndef _WIN32_WCE
 		CHECK(unlink(path) == 0);
-    #endif
-
-	#if USE_MKSTEMP
-		CHECK(close(fd) == 0);
 	#endif
 	}
 };
@@ -460,7 +441,7 @@ TEST_XML(document_save_file_wide, "<node/>")
 	temp_file f;
 
 	// widen the path
-	wchar_t wpath[32];
+	wchar_t wpath[sizeof(f.path)];
 	std::copy(f.path, f.path + strlen(f.path) + 1, wpath + 0);
 
 	CHECK(doc.save_file(wpath));
@@ -490,7 +471,7 @@ TEST_XML(document_save_file_wide_text, "<node/>")
 	temp_file f;
 
 	// widen the path
-	wchar_t wpath[32];
+	wchar_t wpath[sizeof(f.path)];
 	std::copy(f.path, f.path + strlen(f.path) + 1, wpath + 0);
 
 	CHECK(doc.save_file(wpath, STR(""), pugi::format_no_declaration | pugi::format_save_file_text));
@@ -911,16 +892,52 @@ TEST(document_load_buffer_empty)
 		xml_encoding encoding = encodings[i];
 
 		xml_document doc;
-		CHECK(doc.load_buffer(buffer, 0, parse_default, encoding) && !doc.first_child());
-		CHECK(doc.load_buffer(0, 0, parse_default, encoding) && !doc.first_child());
+		CHECK(doc.load_buffer(buffer, 0, parse_default, encoding).status == status_no_document_element && !doc.first_child());
+		CHECK(doc.load_buffer(0, 0, parse_default, encoding).status == status_no_document_element && !doc.first_child());
 
-		CHECK(doc.load_buffer_inplace(buffer, 0, parse_default, encoding) && !doc.first_child());
-		CHECK(doc.load_buffer_inplace(0, 0, parse_default, encoding) && !doc.first_child());
+		CHECK(doc.load_buffer_inplace(buffer, 0, parse_default, encoding).status == status_no_document_element && !doc.first_child());
+		CHECK(doc.load_buffer_inplace(0, 0, parse_default, encoding).status == status_no_document_element && !doc.first_child());
 
 		void* own_buffer = pugi::get_memory_allocation_function()(1);
 
-		CHECK(doc.load_buffer_inplace_own(own_buffer, 0, parse_default, encoding) && !doc.first_child());
-		CHECK(doc.load_buffer_inplace_own(0, 0, parse_default, encoding) && !doc.first_child());
+		CHECK(doc.load_buffer_inplace_own(own_buffer, 0, parse_default, encoding).status == status_no_document_element && !doc.first_child());
+		CHECK(doc.load_buffer_inplace_own(0, 0, parse_default, encoding).status == status_no_document_element && !doc.first_child());
+	}
+}
+
+TEST(document_load_buffer_empty_fragment)
+{
+	xml_encoding encodings[] =
+	{
+		encoding_auto,
+		encoding_utf8,
+		encoding_utf16_le,
+		encoding_utf16_be,
+		encoding_utf16,
+		encoding_utf32_le,
+		encoding_utf32_be,
+		encoding_utf32,
+		encoding_wchar,
+        encoding_latin1
+	};
+
+	char buffer[1];
+
+	for (unsigned int i = 0; i < sizeof(encodings) / sizeof(encodings[0]); ++i)
+	{
+		xml_encoding encoding = encodings[i];
+
+		xml_document doc;
+		CHECK(doc.load_buffer(buffer, 0, parse_fragment, encoding) && !doc.first_child());
+		CHECK(doc.load_buffer(0, 0, parse_fragment, encoding) && !doc.first_child());
+
+		CHECK(doc.load_buffer_inplace(buffer, 0, parse_fragment, encoding) && !doc.first_child());
+		CHECK(doc.load_buffer_inplace(0, 0, parse_fragment, encoding) && !doc.first_child());
+
+		void* own_buffer = pugi::get_memory_allocation_function()(1);
+
+		CHECK(doc.load_buffer_inplace_own(own_buffer, 0, parse_fragment, encoding) && !doc.first_child());
+		CHECK(doc.load_buffer_inplace_own(0, 0, parse_fragment, encoding) && !doc.first_child());
 	}
 }
 
@@ -937,13 +954,27 @@ TEST(document_progressive_truncation)
 	{
 		char* truncated_data = buffer + original_size - i;
 
-		memcpy(truncated_data, original_data, i);
+		// default flags
+		{
+			memcpy(truncated_data, original_data, i);
 
-		xml_document doc;
-		bool result = doc.load_buffer_inplace(truncated_data, i);
+			xml_document doc;
+			bool result = doc.load_buffer_inplace(truncated_data, i);
 
-		// some truncate locations are parseable - those that come after declaration, declaration + doctype, declaration + doctype + comment and eof
-		CHECK(((i - 21) < 3 || (i - 66) < 3 || (i - 95) < 3 || i >= 3325) ? result : !result);
+			// only eof is parseable
+			CHECK((i >= 3325) ? result : !result);
+		}
+
+		// fragment mode
+		{
+			memcpy(truncated_data, original_data, i);
+
+			xml_document doc;
+			bool result = doc.load_buffer_inplace(truncated_data, i, parse_default | parse_fragment);
+
+			// some truncate locations are parseable - those that come after declaration, declaration + doctype, declaration + doctype + comment and eof
+			CHECK(((i - 21) < 3 || (i - 66) < 3 || (i - 95) < 3 || i >= 3325) ? result : !result);
+		}
 	}
 
 	delete[] buffer;
@@ -957,12 +988,29 @@ TEST(document_load_buffer_short)
 
 	xml_document doc;
 
-	CHECK(doc.load_buffer(data, 4));
-	CHECK(doc.load_buffer(data + 1, 3));
-	CHECK(doc.load_buffer(data + 2, 2));
-	CHECK(doc.load_buffer(data + 3, 1));
-	CHECK(doc.load_buffer(data + 4, 0));
-	CHECK(doc.load_buffer(0, 0));
+	CHECK(doc.load_buffer(data, 4).status == status_no_document_element);
+	CHECK(doc.load_buffer(data + 1, 3).status == status_no_document_element);
+	CHECK(doc.load_buffer(data + 2, 2).status == status_no_document_element);
+	CHECK(doc.load_buffer(data + 3, 1).status == status_no_document_element);
+	CHECK(doc.load_buffer(data + 4, 0).status == status_no_document_element);
+	CHECK(doc.load_buffer(0, 0).status == status_no_document_element);
+
+	delete[] data;
+}
+
+TEST(document_load_buffer_short_fragment)
+{
+	char* data = new char[4];
+	memcpy(data, "abcd", 4);
+
+	xml_document doc;
+
+	CHECK(doc.load_buffer(data, 4, parse_fragment) && test_string_equal(doc.text().get(), STR("abcd")));
+	CHECK(doc.load_buffer(data + 1, 3, parse_fragment) && test_string_equal(doc.text().get(), STR("bcd")));
+	CHECK(doc.load_buffer(data + 2, 2, parse_fragment) && test_string_equal(doc.text().get(), STR("cd")));
+	CHECK(doc.load_buffer(data + 3, 1, parse_fragment) && test_string_equal(doc.text().get(), STR("d")));
+	CHECK(doc.load_buffer(data + 4, 0, parse_fragment) && !doc.first_child());
+	CHECK(doc.load_buffer(0, 0, parse_fragment) && !doc.first_child());
 
 	delete[] data;
 }
@@ -974,12 +1022,12 @@ TEST(document_load_buffer_inplace_short)
 
 	xml_document doc;
 
-	CHECK(doc.load_buffer_inplace(data, 4));
-	CHECK(doc.load_buffer_inplace(data + 1, 3));
-	CHECK(doc.load_buffer_inplace(data + 2, 2));
-	CHECK(doc.load_buffer_inplace(data + 3, 1));
-	CHECK(doc.load_buffer_inplace(data + 4, 0));
-	CHECK(doc.load_buffer_inplace(0, 0));
+	CHECK(doc.load_buffer_inplace(data, 4).status == status_no_document_element);
+	CHECK(doc.load_buffer_inplace(data + 1, 3).status == status_no_document_element);
+	CHECK(doc.load_buffer_inplace(data + 2, 2).status == status_no_document_element);
+	CHECK(doc.load_buffer_inplace(data + 3, 1).status == status_no_document_element);
+	CHECK(doc.load_buffer_inplace(data + 4, 0).status == status_no_document_element);
+	CHECK(doc.load_buffer_inplace(0, 0).status == status_no_document_element);
 
 	delete[] data;
 }
@@ -1010,7 +1058,7 @@ TEST_XML_FLAGS(document_element, "<?xml version='1.0'?><node><child/></node><!--
     CHECK(doc.document_element() == doc.child(STR("node")));
 }
 
-TEST_XML_FLAGS(document_element_absent, "<!---->", parse_comments)
+TEST_XML_FLAGS(document_element_absent, "<!---->", parse_comments | parse_fragment)
 {
     CHECK(doc.document_element() == xml_node());
 }
@@ -1073,3 +1121,102 @@ TEST_XML(document_reset_copy_self, "<node><child/></node>")
     CHECK(!doc.first_child());
     CHECK_NODE(doc, STR(""));
 }
+
+TEST(document_load_buffer_utf_truncated)
+{
+	const unsigned char utf8[] = {'<', 0xe2, 0x82, 0xac, '/', '>'};
+	const unsigned char utf16_be[] = {0, '<', 0x20, 0xac, 0, '/', 0, '>'};
+	const unsigned char utf16_le[] = {'<', 0, 0xac, 0x20, '/', 0, '>', 0};
+	const unsigned char utf32_be[] = {0, 0, 0, '<', 0, 0, 0x20, 0xac, 0, 0, 0, '/', 0, 0, 0, '>'};
+	const unsigned char utf32_le[] = {'<', 0, 0, 0, 0xac, 0x20, 0, 0, '/', 0, 0, 0, '>', 0, 0, 0};
+
+	struct document_data_t
+	{
+	    xml_encoding encoding;
+
+	    const unsigned char* data;
+	    size_t size;
+	};
+
+	const document_data_t data[] =
+	{
+		{ encoding_utf8, utf8, sizeof(utf8) },
+		{ encoding_utf16_be, utf16_be, sizeof(utf16_be) },
+		{ encoding_utf16_le, utf16_le, sizeof(utf16_le) },
+		{ encoding_utf32_be, utf32_be, sizeof(utf32_be) },
+		{ encoding_utf32_le, utf32_le, sizeof(utf32_le) },
+	};
+
+	for (size_t i = 0; i < sizeof(data) / sizeof(data[0]); ++i)
+	{
+		const document_data_t& d = data[i];
+
+		for (size_t j = 0; j <= d.size; ++j)
+		{
+			char* buffer = new char[j];
+			memcpy(buffer, d.data, j);
+
+			xml_document doc;
+			xml_parse_result res = doc.load_buffer(buffer, j, parse_default, d.encoding);
+
+			if (j == d.size)
+			{
+				CHECK(res);
+
+				const char_t* name = doc.first_child().name();
+
+			#ifdef PUGIXML_WCHAR_MODE
+				CHECK(name[0] == 0x20ac && name[1] == 0);
+			#else
+				CHECK_STRING(name, "\xe2\x82\xac");
+			#endif
+			}
+			else
+			{
+				CHECK(!res || !doc.first_child());
+			}
+
+			delete[] buffer;
+		}
+	}
+}
+
+#ifndef PUGIXML_NO_STL
+TEST(document_load_stream_truncated)
+{
+	const unsigned char utf32_be[] = {0, 0, 0, '<', 0, 0, 0x20, 0xac, 0, 0, 0, '/', 0, 0, 0, '>'};
+
+	for (size_t i = 0; i <= sizeof(utf32_be); ++i)
+	{
+		std::string prefix(reinterpret_cast<const char*>(utf32_be), i);
+		std::istringstream iss(prefix);
+
+		xml_document doc;
+		xml_parse_result res = doc.load(iss);
+
+		if (i == sizeof(utf32_be))
+		{
+			CHECK(res);
+		}
+		else
+		{
+			CHECK(!res || !doc.first_child());
+
+			if (i < 8)
+			{
+				CHECK(!doc.first_child());
+			}
+			else
+			{
+				const char_t* name = doc.first_child().name();
+
+			#ifdef PUGIXML_WCHAR_MODE
+				CHECK(name[0] == 0x20ac && name[1] == 0);
+			#else
+				CHECK_STRING(name, "\xe2\x82\xac");
+			#endif
+			}
+		}
+	}
+}
+#endif

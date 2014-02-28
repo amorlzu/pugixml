@@ -22,12 +22,6 @@ template <typename I> static I move_iter(I base, int n)
 	else while (n++) --base;
 	return base;
 }
-
-static xml_named_node_iterator move_iter(xml_named_node_iterator base, int n)
-{
-	while (n--) ++base;
-	return base;
-}
 #else
 template <typename I> static I move_iter(I base, int n)
 {
@@ -87,7 +81,7 @@ TEST_XML(dom_attr_as_string, "<node attr='1'/>")
 	CHECK_STRING(xml_attribute().as_string(), STR(""));
 }
 
-TEST_XML(dom_attr_as_int, "<node attr1='1' attr2='-1' attr3='-2147483648' attr4='2147483647'/>")
+TEST_XML(dom_attr_as_int, "<node attr1='1' attr2='-1' attr3='-2147483648' attr4='2147483647' attr5='0'/>")
 {
 	xml_node node = doc.child(STR("node"));
 
@@ -96,9 +90,22 @@ TEST_XML(dom_attr_as_int, "<node attr1='1' attr2='-1' attr3='-2147483648' attr4=
 	CHECK(node.attribute(STR("attr2")).as_int() == -1);
 	CHECK(node.attribute(STR("attr3")).as_int() == -2147483647 - 1);
 	CHECK(node.attribute(STR("attr4")).as_int() == 2147483647);
+	CHECK(node.attribute(STR("attr5")).as_int() == 0);
 }
 
-TEST_XML(dom_attr_as_uint, "<node attr1='0' attr2='1' attr3='2147483647' attr4='4294967295'/>")
+TEST_XML(dom_attr_as_int_hex, "<node attr1='0777' attr2='0x5ab' attr3='0XFf' attr4='-0x20' attr5='-0x80000000' attr6='0x'/>")
+{
+	xml_node node = doc.child(STR("node"));
+
+	CHECK(node.attribute(STR("attr1")).as_int() == 777); // no octal support! intentional
+	CHECK(node.attribute(STR("attr2")).as_int() == 1451);
+	CHECK(node.attribute(STR("attr3")).as_int() == 255);
+	CHECK(node.attribute(STR("attr4")).as_int() == -32);
+	CHECK(node.attribute(STR("attr5")).as_int() == -2147483647 - 1);
+	CHECK(node.attribute(STR("attr6")).as_int() == 0);
+}
+
+TEST_XML(dom_attr_as_uint, "<node attr1='0' attr2='1' attr3='2147483647' attr4='4294967295' attr5='0'/>")
 {
 	xml_node node = doc.child(STR("node"));
 
@@ -107,6 +114,29 @@ TEST_XML(dom_attr_as_uint, "<node attr1='0' attr2='1' attr3='2147483647' attr4='
 	CHECK(node.attribute(STR("attr2")).as_uint() == 1);
 	CHECK(node.attribute(STR("attr3")).as_uint() == 2147483647);
 	CHECK(node.attribute(STR("attr4")).as_uint() == 4294967295u);
+	CHECK(node.attribute(STR("attr5")).as_uint() == 0);
+}
+
+TEST_XML(dom_attr_as_uint_hex, "<node attr1='0777' attr2='0x5ab' attr3='0XFf' attr4='0x20' attr5='0xFFFFFFFF' attr6='0x'/>")
+{
+	xml_node node = doc.child(STR("node"));
+
+	CHECK(node.attribute(STR("attr1")).as_uint() == 777); // no octal support! intentional
+	CHECK(node.attribute(STR("attr2")).as_uint() == 1451);
+	CHECK(node.attribute(STR("attr3")).as_uint() == 255);
+	CHECK(node.attribute(STR("attr4")).as_uint() == 32);
+	CHECK(node.attribute(STR("attr5")).as_uint() == 4294967295u);
+	CHECK(node.attribute(STR("attr6")).as_uint() == 0);
+}
+
+TEST_XML(dom_attr_as_integer_space, "<node attr1=' \t1234' attr2='\t 0x123' attr3='- 16' attr4='- 0x10'/>")
+{
+	xml_node node = doc.child(STR("node"));
+
+	CHECK(node.attribute(STR("attr1")).as_int() == 1234);
+	CHECK(node.attribute(STR("attr2")).as_int() == 291);
+	CHECK(node.attribute(STR("attr3")).as_int() == 0);
+	CHECK(node.attribute(STR("attr4")).as_int() == 0);
 }
 
 TEST_XML(dom_attr_as_float, "<node attr1='0' attr2='1' attr3='0.12' attr4='-5.1' attr5='3e-4' attr6='3.14159265358979323846'/>")
@@ -149,6 +179,56 @@ TEST_XML(dom_attr_as_bool, "<node attr1='0' attr2='1' attr3='true' attr4='True' 
 	CHECK(!node.attribute(STR("attr7")).as_bool());
 }
 
+#ifdef PUGIXML_HAS_LONG_LONG
+TEST_XML(dom_attr_as_llong, "<node attr1='1' attr2='-1' attr3='-9223372036854775808' attr4='9223372036854775807' attr5='0'/>")
+{
+	xml_node node = doc.child(STR("node"));
+
+	CHECK(xml_attribute().as_llong() == 0);
+	CHECK(node.attribute(STR("attr1")).as_llong() == 1);
+	CHECK(node.attribute(STR("attr2")).as_llong() == -1);
+	CHECK(node.attribute(STR("attr3")).as_llong() == -9223372036854775807ll - 1);
+	CHECK(node.attribute(STR("attr4")).as_llong() == 9223372036854775807ll);
+	CHECK(node.attribute(STR("attr5")).as_llong() == 0);
+}
+
+TEST_XML(dom_attr_as_llong_hex, "<node attr1='0777' attr2='0x5ab' attr3='0XFf' attr4='-0x20' attr5='-0x8000000000000000' attr6='0x'/>")
+{
+	xml_node node = doc.child(STR("node"));
+
+	CHECK(node.attribute(STR("attr1")).as_llong() == 777); // no octal support! intentional
+	CHECK(node.attribute(STR("attr2")).as_llong() == 1451);
+	CHECK(node.attribute(STR("attr3")).as_llong() == 255);
+	CHECK(node.attribute(STR("attr4")).as_llong() == -32);
+	CHECK(node.attribute(STR("attr5")).as_llong() == -9223372036854775807ll - 1);
+	CHECK(node.attribute(STR("attr6")).as_llong() == 0);
+}
+
+TEST_XML(dom_attr_as_ullong, "<node attr1='0' attr2='1' attr3='9223372036854775807' attr4='18446744073709551615' attr5='0'/>")
+{
+	xml_node node = doc.child(STR("node"));
+
+	CHECK(xml_attribute().as_ullong() == 0);
+	CHECK(node.attribute(STR("attr1")).as_ullong() == 0);
+	CHECK(node.attribute(STR("attr2")).as_ullong() == 1);
+	CHECK(node.attribute(STR("attr3")).as_ullong() == 9223372036854775807ull);
+	CHECK(node.attribute(STR("attr4")).as_ullong() == 18446744073709551615ull);
+	CHECK(node.attribute(STR("attr5")).as_ullong() == 0);
+}
+
+TEST_XML(dom_attr_as_ullong_hex, "<node attr1='0777' attr2='0x5ab' attr3='0XFf' attr4='0x20' attr5='0xFFFFFFFFFFFFFFFF' attr6='0x'/>")
+{
+	xml_node node = doc.child(STR("node"));
+
+	CHECK(node.attribute(STR("attr1")).as_ullong() == 777); // no octal support! intentional
+	CHECK(node.attribute(STR("attr2")).as_ullong() == 1451);
+	CHECK(node.attribute(STR("attr3")).as_ullong() == 255);
+	CHECK(node.attribute(STR("attr4")).as_ullong() == 32);
+	CHECK(node.attribute(STR("attr5")).as_ullong() == 18446744073709551615ull);
+	CHECK(node.attribute(STR("attr6")).as_ullong() == 0);
+}
+#endif
+
 TEST(dom_attr_defaults)
 {
     xml_attribute attr;
@@ -159,6 +239,11 @@ TEST(dom_attr_defaults)
     CHECK(attr.as_double(42) == 42);
     CHECK(attr.as_float(42) == 42);
     CHECK(attr.as_bool(true) == true);
+
+#ifdef PUGIXML_HAS_LONG_LONG
+    CHECK(attr.as_llong(42) == 42);
+    CHECK(attr.as_ullong(42) == 42);
+#endif
 }
 
 TEST_XML(dom_attr_iterator, "<node><node1 attr1='0'/><node2 attr1='0' attr2='1'/><node3/></node>")
@@ -537,6 +622,33 @@ TEST_XML(dom_node_find_child_by_attribute, "<node><stub attr='value3' /><child1 
 	CHECK(node.find_child_by_attribute(STR("attr3"), STR("value")) == xml_node());
 }
 
+TEST(dom_node_find_child_by_attribute_null)
+{
+	xml_document doc;
+	xml_node node0 = doc.append_child();
+	xml_node node1 = doc.append_child(STR("a"));
+	xml_node node2 = doc.append_child(STR("a"));
+	xml_node node3 = doc.append_child(STR("a"));
+
+	(void)node0;
+
+	// this adds an attribute with null name and/or value in the internal representation
+	node1.append_attribute(STR(""));
+	node2.append_attribute(STR("id"));
+	node3.append_attribute(STR("id")) = STR("1");
+
+	// make sure find_child_by_attribute works if name/value is null
+	CHECK(doc.find_child_by_attribute(STR("unknown"), STR("wrong")) == xml_node());
+	CHECK(doc.find_child_by_attribute(STR("id"), STR("wrong")) == xml_node());
+	CHECK(doc.find_child_by_attribute(STR("id"), STR("")) == node2);
+	CHECK(doc.find_child_by_attribute(STR("id"), STR("1")) == node3);
+
+	CHECK(doc.find_child_by_attribute(STR("a"), STR("unknown"), STR("wrong")) == xml_node());
+	CHECK(doc.find_child_by_attribute(STR("a"), STR("id"), STR("wrong")) == xml_node());
+	CHECK(doc.find_child_by_attribute(STR("a"), STR("id"), STR("")) == node2);
+	CHECK(doc.find_child_by_attribute(STR("a"), STR("id"), STR("1")) == node3);
+}
+
 struct find_predicate_const
 {
 	bool result;
@@ -856,36 +968,51 @@ TEST_XML(dom_hash_value, "<node attr='value'>value</node>")
     CHECK(attr_copy.hash_value() == attr.hash_value());
 }
 
-TEST_XML(dom_node_named_iterator, "<node><node1><child/></node1><node2><child/><child/></node2><node3/></node>")
+TEST_XML(dom_node_named_iterator, "<node><node1><child/></node1><node2><child/><child/></node2><node3/><node4><child/><x/></node4></node>")
 {
 	xml_node node1 = doc.child(STR("node")).child(STR("node1"));
 	xml_node node2 = doc.child(STR("node")).child(STR("node2"));
 	xml_node node3 = doc.child(STR("node")).child(STR("node3"));
+	xml_node node4 = doc.child(STR("node")).child(STR("node4"));
 
 	CHECK(xml_named_node_iterator(xml_node(), STR("child")) == xml_named_node_iterator());
 
-    xml_named_node_iterator it1(node1.child(STR("child")), STR("child"));
-	CHECK(move_iter(it1, 1) == xml_named_node_iterator());
-	CHECK(*it1 == node1.child(STR("child")));
-	CHECK_STRING(it1->name(), STR("child"));
+	xml_object_range<xml_named_node_iterator> r1 = node1.children(STR("child"));
+	xml_object_range<xml_named_node_iterator> r2 = node2.children(STR("child"));
+	xml_object_range<xml_named_node_iterator> r3 = node3.children(STR("child"));
+	xml_object_range<xml_named_node_iterator> r4 = node4.children(STR("child"));
 
-    xml_named_node_iterator it2(node2.child(STR("child")), STR("child"));
-	CHECK(move_iter(it2, 1) != xml_named_node_iterator());
-	CHECK(move_iter(it2, 2) == xml_named_node_iterator());
-    CHECK(*it2 == node2.first_child());
-    CHECK(*move_iter(it2, 1) == node2.last_child());
+	CHECK(r1.begin() != r1.end());
+	CHECK(*r1.begin() == node1.first_child());
+	CHECK(r1.begin() == move_iter(r1.end(), -1));
+	CHECK(move_iter(r1.begin(), 1) == r1.end());
 
-    xml_named_node_iterator it3(node3.child(STR("child")), STR("child"));
-	CHECK(it3 == xml_named_node_iterator());
+	CHECK(r2.begin() != r2.end());
+	CHECK(*r2.begin() == node2.first_child());
+	CHECK(*move_iter(r2.begin(), 1) == node2.last_child());
+	CHECK(r2.begin() == move_iter(r2.end(), -2));
+	CHECK(move_iter(r2.begin(), 1) == move_iter(r2.end(), -1));
+	CHECK(move_iter(r2.begin(), 2) == r2.end());
 
-	xml_named_node_iterator it = xml_named_node_iterator(node1.child(STR("child")), STR("child"));
+	CHECK(r3.begin() == r3.end());
+	CHECK(!(r3.begin() != r3.end()));
+
+	CHECK(r4.begin() != r4.end());
+	CHECK(*r4.begin() == node4.first_child());
+	CHECK(r4.begin() == move_iter(r4.end(), -1));
+	CHECK(move_iter(r4.begin(), 1) == r4.end());
+
+	xml_named_node_iterator it = r1.begin();
 	xml_named_node_iterator itt = it;
 
 	CHECK(itt == it);
 
 	CHECK(itt++ == it);
-	CHECK(itt == xml_named_node_iterator());
+	CHECK(itt == r1.end());
 
 	CHECK(itt != it);
 	CHECK(itt == ++it);
+
+	CHECK(itt-- == r1.end());
+	CHECK(itt == r1.begin());
 }

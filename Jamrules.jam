@@ -297,6 +297,11 @@ else if ( $(toolset:I=^msvc) )
             {
                 RESULT += "/I\"%WINKITS_PATH%\\include\\shared\"" ;
                 RESULT += "/I\"%WINKITS_PATH%\\include\\um\"" ;
+
+                if ( $(toolset:I=arm$) )
+                {
+                    RESULT += /D_ARM_WINAPI_PARTITION_DESKTOP_SDK_AVAILABLE ;
+                }
             }
         }
 
@@ -831,14 +836,26 @@ else
 	}
 }
 
+if ( $(OS) = NT )
+{
+    QUICKBOOK = %QUICKBOOK_PATH%\bin\quickbook.exe ;
+    XSLTPROC = %QUICKBOOK_PATH%\bin\xsltproc.exe ;
+}
+else
+{
+    QUICKBOOK = quickbook ;
+    XSLTPROC = xsltproc ;
+    QUICKBOOK_PATH = /usr/share ;
+}
+
 actions QuickbookAction
 {
-	%QUICKBOOK_PATH%\bin\quickbook.exe --output-file $(<) --input-file $(>) >nul
+    $(QUICKBOOK) --output-file $(<) --input-file $(>)
 }
 
 actions response XSLTProcAction
 {
-	%QUICKBOOK_PATH%\bin\xsltproc.exe --path$(SPACE)$(XSLPATH:C) --stringparam$(SPACE)$(XSLPARAM) --output $(<) @(<?xml version="1.0"?>
+	$(XSLTPROC) --nonet --novalid --path$(SPACE)$(XSLPATH:C) --stringparam$(SPACE)$(XSLPARAM) --output $(<) @(<?xml version="1.0"?>
 	<xsl:stylesheet xmlns:xsl="http://www.w3.org/1999/XSL/Transform" version="1.0">
 	<xsl:import$(SPACE)href="file:///$(XSL:/)"$(SPACE)/>
 	</xsl:stylesheet>) $(>)
@@ -969,12 +986,6 @@ rule QuickbookImport SOURCE : IMPORT
 	Includes $(SOURCE) : $(SOURCE:D)/$(IMPORT) ;
 }
 
-rule FullPath FILE
-{
-	local PWD = [ Subst [ Shell "cd" ] : "%c" : "" ] ;
-	return "$(PWD)/$(FILE)" ;
-}
-
 rule Documentation TARGET : SOURCE : STYLESHEET
 {
 	# escape colon with %3A because colon is a path list separator
@@ -1002,7 +1013,7 @@ rule Documentation TARGET : SOURCE : STYLESHEET
 	# docbook -> html
 	local HTML = $(TARGET) ;
 
-	XSL on $(HTML) = $(QUICKBOOK_PATH)/boostbook/xsl/html.xsl [ FullPath $(STYLESHEET) ] ;
+	XSL on $(HTML) = $(QUICKBOOK_PATH)/boostbook/xsl/html.xsl $(CWD)/$(STYLESHEET) ;
 	XSLPATH on $(HTML) = $(XSLDIR)/docbook-xml $(XSLDIR)/docbook-xsl/html $(XSLDIR)/docbook-xsl/lib ;
 
 	XSLPARAM on $(HTML) = 
